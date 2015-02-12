@@ -1,0 +1,21 @@
+{
+  "name": "BitcoinSPVCrx",
+  "version": "0.0.1",
+  "description": "Bitcoin SPV Client",
+  "main": "js/app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#38b6602ff35e87958524af6b4f9de09126f2d3fc",
+    "chrome-dgram": "^2.1.0",
+    "chrome-net": "^2.4.0",
+    "json-loader": "^0.5.1"
+  },
+  "devDependencies": {
+    "xmlhttprequest": "^1.7.0"
+  }
+}

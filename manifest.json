@@ -1,0 +1,36 @@
+{
+  "name": "BitcoinSPV",
+  "description": "Bitcoin SPV Wallet for Chrome",
+  "version": "0.0.1",
+
+  "manifest_version": 2,
+  "minimum_chrome_version": "38.0.2125.7",
+
+  "icons": {
+    "16": "build/assets/icon_16.png",
+    "128": "build/assets/icon_128.png"
+  },
+
+  "app": {
+    "background": {
+      "scripts": ["js/background.js"]
+    }
+  },
+
+  "permissions": [
+    "hid",
+    {
+      "usbDevices": [
+        { "vendorId": 21324, "productId": 1 }
+       ]
+    }
+  ],
+  "sockets" : {
+    "tcp" : {
+        "connect": "*:8333"
+    },
+    "tcpServer" : {
+        "listen": "*:8333"
+    }
+  }
+}
