@@ -7,8 +7,8 @@
   "minimum_chrome_version": "38.0.2125.7",
 
   "icons": {
-    "16": "build/assets/icon_16.png",
-    "128": "build/assets/icon_128.png"
+    "16": "assets/icon_16.png",
+    "128": "assets/icon_128.png"
   },
 
   "app": {

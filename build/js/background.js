@@ -6,7 +6,7 @@
  */
 chrome.app.runtime.onLaunched.addListener(function() {
   chrome.app.window.create(
-    "build/html/index.html",
+    "html/index.html",
     {
       id: "bitcoin-spv-window",
       outerBounds: { minWidth: 800, minHeight: 480 }
