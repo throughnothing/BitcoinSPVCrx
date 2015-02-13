@@ -10,8 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bitcore": "^0.9.5",
-    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#38b6602ff35e87958524af6b4f9de09126f2d3fc",
+    "bitcore": "^0.10.3",
+    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#1a7e7e0a81ba8953f8e0790a48a5617731874d48",
     "chrome-dgram": "^2.1.0",
     "chrome-net": "^2.4.0",
     "json-loader": "^0.5.1"
