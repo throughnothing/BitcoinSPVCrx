@@ -10,7 +10,7 @@ var PeerManager = require('./peermanager');
 chrome.app.runtime.onLaunched.addListener(function() {
     var pm = new PeerManager();
     pm.connect();
-    setInterval(function(){
+    var progressInterval = setInterval(function(){
         console.log('syncProgress:', pm.syncProgress());
     }, 2000);
 
@@ -23,6 +23,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
       function(window) {
           window.onClosed.addListener(function() {
               pm.disconnect();
+              clearInterval(progressInterval);
               console.log('Shut down.');
           });
       }

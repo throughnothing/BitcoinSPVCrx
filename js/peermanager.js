@@ -26,7 +26,7 @@ function PeerManager() {
     this.peers = [];
     this.downloadPeer = null;
     // TODO: Store the chain here for now!
-    this.blockChain = [];
+    this.knownBlockHashes = [];
 }
 
 PeerManager.prototype.connect = function() {
@@ -41,6 +41,7 @@ PeerManager.prototype.connect = function() {
     self.pool.on('peerinv', self.peerInv.bind(this));
     self.pool.on('peertx', self.peerTx.bind(this));
     self.pool.on('peerping', self.peerPing.bind(this));
+    self.pool.on('peererror', self.peerError.bind(this));
     
     self.pool.connect();
     this.connected = true;
@@ -50,15 +51,25 @@ PeerManager.prototype.connect = function() {
 
 PeerManager.prototype.peerConnected = function(peer, addr) {
     var self = this;
+    self.peers.push(peer);
     console.log('connected: ', addr.ip.v4);
     //TODO: Smarter peerDownload detection
     if(!self.downloadPeer) {
         self._setDownloadPeer(peer);
+    } else {
+        // Check if the new peer has a higher height, and switch
+        // downloadPeer, if so
+        if(peer.bestHeight > self.downloadPeer.bestHeight) {
+            console.log('switching downloadPeer');
+            self.downloadPeer.disconnect();
+            self._setDownloadPeer(peer);
+        }
+
     }
-    self.peers.push(peer);
 }
 
 PeerManager.prototype.peerDisconnected = function(peer, addr) {
+    var self = this;
     console.log('removing', addr.hash);
     for(var i in self.peers) {
         if(peer.host == self.peers[i].host){
@@ -69,7 +80,39 @@ PeerManager.prototype.peerDisconnected = function(peer, addr) {
 }
 
 PeerManager.prototype.peerInv = function(peer, message) {
-    console.log('peerinv', message);
+    var self = this;
+    var txHashes = [], blockHashes = [];
+    for(var i in message.inventory) {
+        switch(message.inventory[i].type) {
+            case 1: // TX
+                txHashes.push(message.inventory[i]);
+                break;
+            case 2: // Block
+                blockHashes.push(message.inventory[i]);
+                break;
+            default: break;
+        }
+    }
+
+    // TODO: Check for bloom filter
+
+    // Stole this logic from breadWallet
+    if(txHashes.length > 10000) {
+        console.log('too many transactions, disconnecting from peer');
+        peer.disconnect();
+        return;
+    }
+
+    if(blockHashes.length == 1 &&
+            self.getLatestBlockHash() == blockHashes[0].toString('hex')) {
+        console.log('already had latest block, ignoring');
+        blockHashes = [];
+    }
+    if(blockHashes.length == 1) {
+        console.log('got new block!', blockHashes[0]);
+        peer.sendMessage(
+            new Messages.GetHeaders([self.getLatestBlockHash()]));
+    }
 }
 
 PeerManager.prototype.peerTx = function(peer, message) {
@@ -77,7 +120,12 @@ PeerManager.prototype.peerTx = function(peer, message) {
 }
 
 PeerManager.prototype.peerPing = function(peer, message) {
-    console.log('peerping', message);
+    //console.log('peerping', message);
+    // TODO: pong?
+}
+
+PeerManager.prototype.peerError = function(peer) {
+    console.log('peererror');
 }
 
 PeerManager.prototype.peerHeaders = function(peer, message) {
@@ -87,14 +135,17 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
         var blockHeader = new BlockHeader(message.headers[i]);
         if(blockHeader.validProofOfWork()) {
             var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
-            var latestBlock = self.blockChain[self.blockChain.length-1];
-            if(!self.blockChain.length && blockHeader.hash) {
-                console.log('got first block');
-                self.blockChain.push(blockHeader);
-            } else if (latestBlock && prevHash == latestBlock.hash) {
-                self.blockChain.push(blockHeader);
+            if(!self.knownBlockHashes.length && blockHeader.hash) {
+                // First block
+                self.knownBlockHashes.push(blockHeader.hash);
+            } else if (prevHash == self.getLatestBlockHash()) {
+                self.knownBlockHashes.push(blockHeader.hash);
             } else {
                 console.log('block didnt go on chain');
+            }
+            var syncedHeight = self.syncedHeight();
+            if(syncedHeight > self.bestHeight) {
+                self.bestHeight = syncedHeight;
             }
         }
     }
@@ -115,7 +166,7 @@ PeerManager.prototype.syncProgress = function() {
     var self = this;
     console.log('estimatedBlockHeight',self.estimatedBlockHeight(), self.syncedHeight());
     //TODO: this is really crude and crappy atm
-    return self.blockChain.length /
+    return self.knownBlockHashes.length /
         (self.estimatedBlockHeight() - STARTING_BLOCK_HEIGHT)
 }
 
@@ -129,7 +180,12 @@ PeerManager.prototype.estimatedBlockHeight = function() {
 
 PeerManager.prototype.syncedHeight = function() {
     var self = this;
-    return STARTING_BLOCK_HEIGHT + self.blockChain.length;
+    return STARTING_BLOCK_HEIGHT + self.knownBlockHashes.length;
+}
+
+PeerManager.prototype.getLatestBlockHash = function() {
+    var self = this;
+    return self.knownBlockHashes[self.knownBlockHashes.length -1]
 }
 
 PeerManager.prototype._setDownloadPeer = function(peer) {
