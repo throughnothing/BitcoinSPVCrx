@@ -376,7 +376,7 @@
 
 	// `get` will be removed in Node 0.13+
 	Buffer.prototype.get = function (offset) {
-	  console.log('.get() is deprecated. Access using array indexes instead.')
+	  //console.log('.get() is deprecated. Access using array indexes instead.')
 	  return this.readUInt8(offset)
 	}
 
