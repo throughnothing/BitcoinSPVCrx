@@ -30,7 +30,7 @@ proceed with the development requirements below.
   * Chrome 38 or later. If you're on dev channel you should be fine.
   * Node + [npm](https://www.npmjs.org/).
   * Webpack + App dependencies:
-    * `sudo npm -g install webpack && sudo npm install`
+    * `sudo npm -g install webpack && npm install`
 
 ## Build
 
