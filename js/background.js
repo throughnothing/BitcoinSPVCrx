@@ -1,5 +1,5 @@
 'use strict';
-var pm = require('./peermanager');
+var PeerManager = require('./peermanager');
 
 /**
  * Listens for the app launching, then creates the window.
@@ -8,7 +8,11 @@ var pm = require('./peermanager');
  * @see http://developer.chrome.com/apps/app.window.html
  */
 chrome.app.runtime.onLaunched.addListener(function() {
-    pm.run();
+    var pm = new PeerManager();
+    pm.connect();
+    setInterval(function(){
+        console.log('syncProgress:', pm.syncProgress());
+    }, 2000);
 
     chrome.app.window.create(
       "html/index.html",
@@ -18,7 +22,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
       },
       function(window) {
           window.onClosed.addListener(function() {
-              pm.stop();
+              pm.disconnect();
               console.log('Shut down.');
           });
       }

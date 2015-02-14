@@ -1,5 +1,8 @@
-/* This is the version meant to be runnable from node
- */
 'use strict';
-var pm = require('./peermanager');
-pm.run();
+var PeerManager = require('./peermanager');
+var pm = new PeerManager();
+pm.connect();
+
+setInterval(function(){
+    console.log('syncProgress:', pm.syncProgress());
+}, 2000);
