@@ -7,6 +7,9 @@ with hardwear wallets like Trezor using chrome's usb HID interface.
 Currently it can connect to the bitcoin network, and validate the
 blockchain headers.
 
+BitcoinSPVCrx is a terrible, terrible, name.  I plan to rename it when I
+come up with something better.  Suggestions welcome!
+
 ## Running in Chrome
 
 To run the app, you *do not* need to install the developer requirements
@@ -52,3 +55,8 @@ For now, I have a
 some [edge](https://github.com/feross/chrome-net/pull/22)
 [cases](https://github.com/feross/chrome-net/pull/23) i've discovered with
 `chrome-net`.
+
+BitcoinSPVCrx also uses `js/chrome-statdns.js` to replace node's `dns` module
+when run in Chrome.  This uses [statdns](http://www.statdns.com/) HTTP API to
+resolve DNS entries for bitcoin node seed-finding.  I hope to improve on this
+in the future, and not rely on a single service for this, but it works for now.
