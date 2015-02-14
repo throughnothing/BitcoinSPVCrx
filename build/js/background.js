@@ -45,7 +45,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
-	var pm = __webpack_require__(80);
+	var PeerManager = __webpack_require__(80);
 
 	/**
 	 * Listens for the app launching, then creates the window.
@@ -54,7 +54,11 @@
 	 * @see http://developer.chrome.com/apps/app.window.html
 	 */
 	chrome.app.runtime.onLaunched.addListener(function() {
-	    pm.run();
+	    var pm = new PeerManager();
+	    pm.connect();
+	    setInterval(function(){
+	        console.log('syncProgress:', pm.syncProgress());
+	    }, 2000);
 
 	    chrome.app.window.create(
 	      "html/index.html",
@@ -64,7 +68,7 @@
 	      },
 	      function(window) {
 	          window.onClosed.addListener(function() {
-	              pm.stop();
+	              pm.disconnect();
 	              console.log('Shut down.');
 	          });
 	      }
@@ -372,7 +376,7 @@
 
 	// `get` will be removed in Node 0.13+
 	Buffer.prototype.get = function (offset) {
-	  console.log('.get() is deprecated. Access using array indexes instead.')
+	  //console.log('.get() is deprecated. Access using array indexes instead.')
 	  return this.readUInt8(offset)
 	}
 
@@ -15068,7 +15072,7 @@
 
 	var Address = __webpack_require__(17);
 	var BN = __webpack_require__(6);
-	var Point = __webpack_require__(24);
+	var Point = __webpack_require__(25);
 	var Hash = __webpack_require__(7);
 	var JSUtil = __webpack_require__(4);
 	var Network = __webpack_require__(19);
@@ -16614,7 +16618,7 @@
 	  return Object.prototype.hasOwnProperty.call(obj, prop);
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), __webpack_require__(22)))
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), __webpack_require__(23)))
 
 /***/ },
 /* 17 */
@@ -17507,480 +17511,6 @@
 /* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
-	// shim for using process in browser
-
-	var process = module.exports = {};
-
-	process.nextTick = (function () {
-	    var canSetImmediate = typeof window !== 'undefined'
-	    && window.setImmediate;
-	    var canMutationObserver = typeof window !== 'undefined'
-	    && window.MutationObserver;
-	    var canPost = typeof window !== 'undefined'
-	    && window.postMessage && window.addEventListener
-	    ;
-
-	    if (canSetImmediate) {
-	        return function (f) { return window.setImmediate(f) };
-	    }
-
-	    var queue = [];
-
-	    if (canMutationObserver) {
-	        var hiddenDiv = document.createElement("div");
-	        var observer = new MutationObserver(function () {
-	            var queueList = queue.slice();
-	            queue.length = 0;
-	            queueList.forEach(function (fn) {
-	                fn();
-	            });
-	        });
-
-	        observer.observe(hiddenDiv, { attributes: true });
-
-	        return function nextTick(fn) {
-	            if (!queue.length) {
-	                hiddenDiv.setAttribute('yes', 'no');
-	            }
-	            queue.push(fn);
-	        };
-	    }
-
-	    if (canPost) {
-	        window.addEventListener('message', function (ev) {
-	            var source = ev.source;
-	            if ((source === window || source === null) && ev.data === 'process-tick') {
-	                ev.stopPropagation();
-	                if (queue.length > 0) {
-	                    var fn = queue.shift();
-	                    fn();
-	                }
-	            }
-	        }, true);
-
-	        return function nextTick(fn) {
-	            queue.push(fn);
-	            window.postMessage('process-tick', '*');
-	        };
-	    }
-
-	    return function nextTick(fn) {
-	        setTimeout(fn, 0);
-	    };
-	})();
-
-	process.title = 'browser';
-	process.browser = true;
-	process.env = {};
-	process.argv = [];
-
-	function noop() {}
-
-	process.on = noop;
-	process.addListener = noop;
-	process.once = noop;
-	process.off = noop;
-	process.removeListener = noop;
-	process.removeAllListeners = noop;
-	process.emit = noop;
-
-	process.binding = function (name) {
-	    throw new Error('process.binding is not supported');
-	};
-
-	// TODO(shtylman)
-	process.cwd = function () { return '/' };
-	process.chdir = function (dir) {
-	    throw new Error('process.chdir is not supported');
-	};
-
-
-/***/ },
-/* 23 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
-	//
-	// Permission is hereby granted, free of charge, to any person obtaining a
-	// copy of this software and associated documentation files (the
-	// "Software"), to deal in the Software without restriction, including
-	// without limitation the rights to use, copy, modify, merge, publish,
-	// distribute, sublicense, and/or sell copies of the Software, and to permit
-	// persons to whom the Software is furnished to do so, subject to the
-	// following conditions:
-	//
-	// The above copyright notice and this permission notice shall be included
-	// in all copies or substantial portions of the Software.
-	//
-	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-	// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-	// a duplex stream is just a stream that is both readable and writable.
-	// Since JS doesn't have multiple prototypal inheritance, this class
-	// prototypally inherits from Readable, and then parasitically from
-	// Writable.
-
-	module.exports = Duplex;
-
-	/*<replacement>*/
-	var objectKeys = Object.keys || function (obj) {
-	  var keys = [];
-	  for (var key in obj) keys.push(key);
-	  return keys;
-	}
-	/*</replacement>*/
-
-
-	/*<replacement>*/
-	var util = __webpack_require__(30);
-	util.inherits = __webpack_require__(31);
-	/*</replacement>*/
-
-	var Readable = __webpack_require__(77);
-	var Writable = __webpack_require__(53);
-
-	util.inherits(Duplex, Readable);
-
-	forEach(objectKeys(Writable.prototype), function(method) {
-	  if (!Duplex.prototype[method])
-	    Duplex.prototype[method] = Writable.prototype[method];
-	});
-
-	function Duplex(options) {
-	  if (!(this instanceof Duplex))
-	    return new Duplex(options);
-
-	  Readable.call(this, options);
-	  Writable.call(this, options);
-
-	  if (options && options.readable === false)
-	    this.readable = false;
-
-	  if (options && options.writable === false)
-	    this.writable = false;
-
-	  this.allowHalfOpen = true;
-	  if (options && options.allowHalfOpen === false)
-	    this.allowHalfOpen = false;
-
-	  this.once('end', onend);
-	}
-
-	// the no-half-open enforcer
-	function onend() {
-	  // if we allow half-open state, or if the writable side ended,
-	  // then we're ok.
-	  if (this.allowHalfOpen || this._writableState.ended)
-	    return;
-
-	  // no more data can be written.
-	  // But allow more writes to happen in this tick.
-	  process.nextTick(this.end.bind(this));
-	}
-
-	function forEach (xs, f) {
-	  for (var i = 0, l = xs.length; i < l; i++) {
-	    f(xs[i], i);
-	  }
-	}
-	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(22)))
-
-/***/ },
-/* 24 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
-
-	var BN = __webpack_require__(6);
-	var bufferUtil = __webpack_require__(3);
-	var ec = __webpack_require__(11).curves.secp256k1;
-	var ecPoint = ec.curve.point.bind(ec.curve);
-	var ecPointFromX = ec.curve.pointFromX.bind(ec.curve);
-
-	/**
-	 *
-	 * Instantiate a valid secp256k1 Point from the X and Y coordinates.
-	 *
-	 * @param {BN|String} x - The X coordinate
-	 * @param {BN|String} y - The Y coordinate
-	 * @link https://github.com/indutny/elliptic
-	 * @augments elliptic.curve.point
-	 * @throws {Error} A validation error if exists
-	 * @returns {Point} An instance of Point
-	 * @constructor
-	 */
-	var Point = function Point(x, y, isRed) {
-	  var point = ecPoint(x, y, isRed);
-	  point.validate();
-	  return point;
-	};
-
-	Point.prototype = Object.getPrototypeOf(ec.curve.point());
-
-	/**
-	 *
-	 * Instantiate a valid secp256k1 Point from only the X coordinate
-	 *
-	 * @param {boolean} odd - If the Y coordinate is odd
-	 * @param {BN|String} x - The X coordinate
-	 * @throws {Error} A validation error if exists
-	 * @returns {Point} An instance of Point
-	 */
-	Point.fromX = function fromX(odd, x){
-	  var point = ecPointFromX(odd, x);
-	  point.validate();
-	  return point;
-	};
-
-	/**
-	 *
-	 * Will return a secp256k1 ECDSA base point.
-	 *
-	 * @link https://en.bitcoin.it/wiki/Secp256k1
-	 * @returns {Point} An instance of the base point.
-	 */
-	Point.getG = function getG() {
-	  return ec.curve.g;
-	};
-
-	/**
-	 *
-	 * Will return the max of range of valid private keys as governed by the secp256k1 ECDSA standard.
-	 *
-	 * @link https://en.bitcoin.it/wiki/Private_key#Range_of_valid_ECDSA_private_keys
-	 * @returns {BN} A BN instance of the number of points on the curve
-	 */
-	Point.getN = function getN() {
-	  return new BN(ec.curve.n.toArray());
-	};
-
-	Point.prototype._getX = Point.prototype.getX;
-
-	/**
-	 *
-	 * Will return the X coordinate of the Point
-	 *
-	 * @returns {BN} A BN instance of the X coordinate
-	 */
-	Point.prototype.getX = function getX() {
-	  return new BN(this._getX().toArray());
-	};
-
-	Point.prototype._getY = Point.prototype.getY;
-
-	/**
-	 *
-	 * Will return the Y coordinate of the Point
-	 *
-	 * @returns {BN} A BN instance of the Y coordinate
-	 */
-	Point.prototype.getY = function getY() {
-	  return new BN(this._getY().toArray());
-	};
-
-	/**
-	 *
-	 * Will determine if the point is valid
-	 *
-	 * @link https://www.iacr.org/archive/pkc2003/25670211/25670211.pdf
-	 * @param {Point} An instance of Point
-	 * @throws {Error} A validation error if exists
-	 * @returns {Point} An instance of the same Point
-	 */
-	Point.prototype.validate = function validate() {
-
-	  if (this.isInfinity()){
-	    throw new Error('Point cannot be equal to Infinity');
-	  }
-
-	  if (this.getX().cmp(BN.Zero) === 0 || this.getY().cmp(BN.Zero) === 0){
-	    throw new Error('Invalid x,y value for curve, cannot equal 0.');
-	  }
-
-	  var p2 = ecPointFromX(this.getY().isOdd(), this.getX());
-
-	  if (p2.y.cmp(this.y) !== 0) {
-	    throw new Error('Invalid y value for curve.');
-	  }
-
-	  var xValidRange = (this.getX().gt(BN.Minus1) && this.getX().lt(Point.getN()));
-	  var yValidRange = (this.getY().gt(BN.Minus1) && this.getY().lt(Point.getN()));
-
-	  if ( !xValidRange || !yValidRange ) {
-	    throw new Error('Point does not lie on the curve');
-	  }
-
-	  //todo: needs test case
-	  if (!(this.mul(Point.getN()).isInfinity())) {
-	    throw new Error('Point times N must be infinity');
-	  }
-
-	  return this;
-
-	};
-
-	Point.pointToCompressed = function pointToCompressed(point) {
-	  var xbuf = point.getX().toBuffer({size: 32});
-	  var ybuf = point.getY().toBuffer({size: 32});
-
-	  var prefix;
-	  var odd = ybuf[ybuf.length - 1] % 2;
-	  if (odd) {
-	    prefix = new Buffer([0x03]);
-	  } else {
-	    prefix = new Buffer([0x02]);
-	  }
-	  return bufferUtil.concat([prefix, xbuf]);
-	};
-
-	module.exports = Point;
-	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
-
-/***/ },
-/* 25 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-
-	var _ = __webpack_require__(2);
-	var BN = __webpack_require__(6);
-	var buffer = __webpack_require__(1);
-	var bufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
-	var BufferWriter = __webpack_require__(14);
-	var Script = __webpack_require__(9);
-
-	function Output(params) {
-	  if (!(this instanceof Output)) {
-	    return new Output(params);
-	  }
-	  if (params) {
-	    if (JSUtil.isValidJSON(params)) {
-	      return Output.fromJSON(params);
-	    }
-	    return this._fromObject(params);
-	  }
-	}
-
-	Object.defineProperty(Output.prototype, 'script', {
-	  configurable: false,
-	  writeable: false,
-	  enumerable: true,
-	  get: function() {
-	    if (!this._script) {
-	      this._script = new Script(this._scriptBuffer);
-	    }
-	    return this._script;
-	  }
-	});
-
-	Object.defineProperty(Output.prototype, 'satoshis', {
-	  configurable: false,
-	  writeable: true,
-	  enumerable: true,
-	  get: function() {
-	    return this._satoshis;
-	  },
-	  set: function(num) {
-	    if (num instanceof BN) {
-	      this._satoshisBN = num;
-	      this._satoshis = num.toNumber();
-	    } else if (_.isString(num)) {
-	      this._satoshis = parseInt(num);
-	      this._satoshisBN = BN.fromNumber(this._satoshis);
-	    } else {
-	      this._satoshisBN = BN.fromNumber(num);
-	      this._satoshis = num;
-	    }
-	  }
-	});
-
-	Output.prototype._fromObject = function(param) {
-	  this.satoshis = param.satoshis;
-	  if (param.script || param.scriptBuffer) {
-	    this.setScript(param.script || param.scriptBuffer);
-	  }
-	  return this;
-	};
-
-	Output.prototype.toObject = function toObject() {
-	  return {
-	    satoshis: this.satoshis,
-	    script: this.script.toString()
-	  };
-	};
-
-	Output.prototype.toJSON = function toJSON() {
-	  return JSON.stringify(this.toObject());
-	};
-
-	Output.fromJSON = function(json) {
-	  if (JSUtil.isValidJSON(json)) {
-	    json = JSON.parse(json);
-	  }
-	  return new Output({
-	    satoshis: json.satoshis || -(-json.valuebn),
-	    script: new Script(json.script)
-	  });
-	};
-
-	Output.prototype.setScript = function(script) {
-	  if (script instanceof Script) {
-	    this._scriptBuffer = script.toBuffer();
-	    this._script = script;
-	  } else if (_.isString(script)) {
-	    this._script = new Script(script);
-	    this._scriptBuffer = this._script.toBuffer();
-	  } else if (bufferUtil.isBuffer(script)) {
-	    this._scriptBuffer = script;
-	    this._script = null;
-	  } else {
-	    throw new TypeError('Unrecognized Argument');
-	  }
-	  return this;
-	};
-
-	Output.prototype.inspect = function() {
-	  return '<Output (' + this.satoshis + ' sats) ' + this.script.inspect() + '>';
-	};
-
-	Output.fromBufferReader = function(br) {
-	  var output = new Output();
-	  output.satoshis = br.readUInt64LEBN();
-	  var size = br.readVarintNum();
-	  if (size !== 0) {
-	    output._scriptBuffer = br.read(size);
-	  } else {
-	    output._scriptBuffer = new buffer.Buffer([]);
-	  }
-	  return output;
-	};
-
-	Output.prototype.toBufferWriter = function(writer) {
-	  if (!writer) {
-	    writer = new BufferWriter();
-	  }
-	  writer.writeUInt64LEBN(this._satoshisBN);
-	  var script = this._scriptBuffer;
-	  writer.writeVarintNum(script.length);
-	  writer.write(script);
-	  return writer;
-	};
-
-	module.exports = Output;
-
-
-/***/ },
-/* 26 */
-/***/ function(module, exports, __webpack_require__) {
-
 	// Copyright Joyent, Inc. and other Node contributors.
 	//
 	// Permission is hereby granted, free of charge, to any person obtaining a
@@ -18285,6 +17815,480 @@
 
 
 /***/ },
+/* 23 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// shim for using process in browser
+
+	var process = module.exports = {};
+
+	process.nextTick = (function () {
+	    var canSetImmediate = typeof window !== 'undefined'
+	    && window.setImmediate;
+	    var canMutationObserver = typeof window !== 'undefined'
+	    && window.MutationObserver;
+	    var canPost = typeof window !== 'undefined'
+	    && window.postMessage && window.addEventListener
+	    ;
+
+	    if (canSetImmediate) {
+	        return function (f) { return window.setImmediate(f) };
+	    }
+
+	    var queue = [];
+
+	    if (canMutationObserver) {
+	        var hiddenDiv = document.createElement("div");
+	        var observer = new MutationObserver(function () {
+	            var queueList = queue.slice();
+	            queue.length = 0;
+	            queueList.forEach(function (fn) {
+	                fn();
+	            });
+	        });
+
+	        observer.observe(hiddenDiv, { attributes: true });
+
+	        return function nextTick(fn) {
+	            if (!queue.length) {
+	                hiddenDiv.setAttribute('yes', 'no');
+	            }
+	            queue.push(fn);
+	        };
+	    }
+
+	    if (canPost) {
+	        window.addEventListener('message', function (ev) {
+	            var source = ev.source;
+	            if ((source === window || source === null) && ev.data === 'process-tick') {
+	                ev.stopPropagation();
+	                if (queue.length > 0) {
+	                    var fn = queue.shift();
+	                    fn();
+	                }
+	            }
+	        }, true);
+
+	        return function nextTick(fn) {
+	            queue.push(fn);
+	            window.postMessage('process-tick', '*');
+	        };
+	    }
+
+	    return function nextTick(fn) {
+	        setTimeout(fn, 0);
+	    };
+	})();
+
+	process.title = 'browser';
+	process.browser = true;
+	process.env = {};
+	process.argv = [];
+
+	function noop() {}
+
+	process.on = noop;
+	process.addListener = noop;
+	process.once = noop;
+	process.off = noop;
+	process.removeListener = noop;
+	process.removeAllListeners = noop;
+	process.emit = noop;
+
+	process.binding = function (name) {
+	    throw new Error('process.binding is not supported');
+	};
+
+	// TODO(shtylman)
+	process.cwd = function () { return '/' };
+	process.chdir = function (dir) {
+	    throw new Error('process.chdir is not supported');
+	};
+
+
+/***/ },
+/* 24 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
+	//
+	// Permission is hereby granted, free of charge, to any person obtaining a
+	// copy of this software and associated documentation files (the
+	// "Software"), to deal in the Software without restriction, including
+	// without limitation the rights to use, copy, modify, merge, publish,
+	// distribute, sublicense, and/or sell copies of the Software, and to permit
+	// persons to whom the Software is furnished to do so, subject to the
+	// following conditions:
+	//
+	// The above copyright notice and this permission notice shall be included
+	// in all copies or substantial portions of the Software.
+	//
+	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+	// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+	// a duplex stream is just a stream that is both readable and writable.
+	// Since JS doesn't have multiple prototypal inheritance, this class
+	// prototypally inherits from Readable, and then parasitically from
+	// Writable.
+
+	module.exports = Duplex;
+
+	/*<replacement>*/
+	var objectKeys = Object.keys || function (obj) {
+	  var keys = [];
+	  for (var key in obj) keys.push(key);
+	  return keys;
+	}
+	/*</replacement>*/
+
+
+	/*<replacement>*/
+	var util = __webpack_require__(30);
+	util.inherits = __webpack_require__(31);
+	/*</replacement>*/
+
+	var Readable = __webpack_require__(77);
+	var Writable = __webpack_require__(53);
+
+	util.inherits(Duplex, Readable);
+
+	forEach(objectKeys(Writable.prototype), function(method) {
+	  if (!Duplex.prototype[method])
+	    Duplex.prototype[method] = Writable.prototype[method];
+	});
+
+	function Duplex(options) {
+	  if (!(this instanceof Duplex))
+	    return new Duplex(options);
+
+	  Readable.call(this, options);
+	  Writable.call(this, options);
+
+	  if (options && options.readable === false)
+	    this.readable = false;
+
+	  if (options && options.writable === false)
+	    this.writable = false;
+
+	  this.allowHalfOpen = true;
+	  if (options && options.allowHalfOpen === false)
+	    this.allowHalfOpen = false;
+
+	  this.once('end', onend);
+	}
+
+	// the no-half-open enforcer
+	function onend() {
+	  // if we allow half-open state, or if the writable side ended,
+	  // then we're ok.
+	  if (this.allowHalfOpen || this._writableState.ended)
+	    return;
+
+	  // no more data can be written.
+	  // But allow more writes to happen in this tick.
+	  process.nextTick(this.end.bind(this));
+	}
+
+	function forEach (xs, f) {
+	  for (var i = 0, l = xs.length; i < l; i++) {
+	    f(xs[i], i);
+	  }
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23)))
+
+/***/ },
+/* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
+
+	var BN = __webpack_require__(6);
+	var bufferUtil = __webpack_require__(3);
+	var ec = __webpack_require__(11).curves.secp256k1;
+	var ecPoint = ec.curve.point.bind(ec.curve);
+	var ecPointFromX = ec.curve.pointFromX.bind(ec.curve);
+
+	/**
+	 *
+	 * Instantiate a valid secp256k1 Point from the X and Y coordinates.
+	 *
+	 * @param {BN|String} x - The X coordinate
+	 * @param {BN|String} y - The Y coordinate
+	 * @link https://github.com/indutny/elliptic
+	 * @augments elliptic.curve.point
+	 * @throws {Error} A validation error if exists
+	 * @returns {Point} An instance of Point
+	 * @constructor
+	 */
+	var Point = function Point(x, y, isRed) {
+	  var point = ecPoint(x, y, isRed);
+	  point.validate();
+	  return point;
+	};
+
+	Point.prototype = Object.getPrototypeOf(ec.curve.point());
+
+	/**
+	 *
+	 * Instantiate a valid secp256k1 Point from only the X coordinate
+	 *
+	 * @param {boolean} odd - If the Y coordinate is odd
+	 * @param {BN|String} x - The X coordinate
+	 * @throws {Error} A validation error if exists
+	 * @returns {Point} An instance of Point
+	 */
+	Point.fromX = function fromX(odd, x){
+	  var point = ecPointFromX(odd, x);
+	  point.validate();
+	  return point;
+	};
+
+	/**
+	 *
+	 * Will return a secp256k1 ECDSA base point.
+	 *
+	 * @link https://en.bitcoin.it/wiki/Secp256k1
+	 * @returns {Point} An instance of the base point.
+	 */
+	Point.getG = function getG() {
+	  return ec.curve.g;
+	};
+
+	/**
+	 *
+	 * Will return the max of range of valid private keys as governed by the secp256k1 ECDSA standard.
+	 *
+	 * @link https://en.bitcoin.it/wiki/Private_key#Range_of_valid_ECDSA_private_keys
+	 * @returns {BN} A BN instance of the number of points on the curve
+	 */
+	Point.getN = function getN() {
+	  return new BN(ec.curve.n.toArray());
+	};
+
+	Point.prototype._getX = Point.prototype.getX;
+
+	/**
+	 *
+	 * Will return the X coordinate of the Point
+	 *
+	 * @returns {BN} A BN instance of the X coordinate
+	 */
+	Point.prototype.getX = function getX() {
+	  return new BN(this._getX().toArray());
+	};
+
+	Point.prototype._getY = Point.prototype.getY;
+
+	/**
+	 *
+	 * Will return the Y coordinate of the Point
+	 *
+	 * @returns {BN} A BN instance of the Y coordinate
+	 */
+	Point.prototype.getY = function getY() {
+	  return new BN(this._getY().toArray());
+	};
+
+	/**
+	 *
+	 * Will determine if the point is valid
+	 *
+	 * @link https://www.iacr.org/archive/pkc2003/25670211/25670211.pdf
+	 * @param {Point} An instance of Point
+	 * @throws {Error} A validation error if exists
+	 * @returns {Point} An instance of the same Point
+	 */
+	Point.prototype.validate = function validate() {
+
+	  if (this.isInfinity()){
+	    throw new Error('Point cannot be equal to Infinity');
+	  }
+
+	  if (this.getX().cmp(BN.Zero) === 0 || this.getY().cmp(BN.Zero) === 0){
+	    throw new Error('Invalid x,y value for curve, cannot equal 0.');
+	  }
+
+	  var p2 = ecPointFromX(this.getY().isOdd(), this.getX());
+
+	  if (p2.y.cmp(this.y) !== 0) {
+	    throw new Error('Invalid y value for curve.');
+	  }
+
+	  var xValidRange = (this.getX().gt(BN.Minus1) && this.getX().lt(Point.getN()));
+	  var yValidRange = (this.getY().gt(BN.Minus1) && this.getY().lt(Point.getN()));
+
+	  if ( !xValidRange || !yValidRange ) {
+	    throw new Error('Point does not lie on the curve');
+	  }
+
+	  //todo: needs test case
+	  if (!(this.mul(Point.getN()).isInfinity())) {
+	    throw new Error('Point times N must be infinity');
+	  }
+
+	  return this;
+
+	};
+
+	Point.pointToCompressed = function pointToCompressed(point) {
+	  var xbuf = point.getX().toBuffer({size: 32});
+	  var ybuf = point.getY().toBuffer({size: 32});
+
+	  var prefix;
+	  var odd = ybuf[ybuf.length - 1] % 2;
+	  if (odd) {
+	    prefix = new Buffer([0x03]);
+	  } else {
+	    prefix = new Buffer([0x02]);
+	  }
+	  return bufferUtil.concat([prefix, xbuf]);
+	};
+
+	module.exports = Point;
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+
+/***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _ = __webpack_require__(2);
+	var BN = __webpack_require__(6);
+	var buffer = __webpack_require__(1);
+	var bufferUtil = __webpack_require__(3);
+	var JSUtil = __webpack_require__(4);
+	var BufferWriter = __webpack_require__(14);
+	var Script = __webpack_require__(9);
+
+	function Output(params) {
+	  if (!(this instanceof Output)) {
+	    return new Output(params);
+	  }
+	  if (params) {
+	    if (JSUtil.isValidJSON(params)) {
+	      return Output.fromJSON(params);
+	    }
+	    return this._fromObject(params);
+	  }
+	}
+
+	Object.defineProperty(Output.prototype, 'script', {
+	  configurable: false,
+	  writeable: false,
+	  enumerable: true,
+	  get: function() {
+	    if (!this._script) {
+	      this._script = new Script(this._scriptBuffer);
+	    }
+	    return this._script;
+	  }
+	});
+
+	Object.defineProperty(Output.prototype, 'satoshis', {
+	  configurable: false,
+	  writeable: true,
+	  enumerable: true,
+	  get: function() {
+	    return this._satoshis;
+	  },
+	  set: function(num) {
+	    if (num instanceof BN) {
+	      this._satoshisBN = num;
+	      this._satoshis = num.toNumber();
+	    } else if (_.isString(num)) {
+	      this._satoshis = parseInt(num);
+	      this._satoshisBN = BN.fromNumber(this._satoshis);
+	    } else {
+	      this._satoshisBN = BN.fromNumber(num);
+	      this._satoshis = num;
+	    }
+	  }
+	});
+
+	Output.prototype._fromObject = function(param) {
+	  this.satoshis = param.satoshis;
+	  if (param.script || param.scriptBuffer) {
+	    this.setScript(param.script || param.scriptBuffer);
+	  }
+	  return this;
+	};
+
+	Output.prototype.toObject = function toObject() {
+	  return {
+	    satoshis: this.satoshis,
+	    script: this.script.toString()
+	  };
+	};
+
+	Output.prototype.toJSON = function toJSON() {
+	  return JSON.stringify(this.toObject());
+	};
+
+	Output.fromJSON = function(json) {
+	  if (JSUtil.isValidJSON(json)) {
+	    json = JSON.parse(json);
+	  }
+	  return new Output({
+	    satoshis: json.satoshis || -(-json.valuebn),
+	    script: new Script(json.script)
+	  });
+	};
+
+	Output.prototype.setScript = function(script) {
+	  if (script instanceof Script) {
+	    this._scriptBuffer = script.toBuffer();
+	    this._script = script;
+	  } else if (_.isString(script)) {
+	    this._script = new Script(script);
+	    this._scriptBuffer = this._script.toBuffer();
+	  } else if (bufferUtil.isBuffer(script)) {
+	    this._scriptBuffer = script;
+	    this._script = null;
+	  } else {
+	    throw new TypeError('Unrecognized Argument');
+	  }
+	  return this;
+	};
+
+	Output.prototype.inspect = function() {
+	  return '<Output (' + this.satoshis + ' sats) ' + this.script.inspect() + '>';
+	};
+
+	Output.fromBufferReader = function(br) {
+	  var output = new Output();
+	  output.satoshis = br.readUInt64LEBN();
+	  var size = br.readVarintNum();
+	  if (size !== 0) {
+	    output._scriptBuffer = br.read(size);
+	  } else {
+	    output._scriptBuffer = new buffer.Buffer([]);
+	  }
+	  return output;
+	};
+
+	Output.prototype.toBufferWriter = function(writer) {
+	  if (!writer) {
+	    writer = new BufferWriter();
+	  }
+	  writer.writeUInt64LEBN(this._satoshisBN);
+	  var script = this._scriptBuffer;
+	  writer.writeVarintNum(script.length);
+	  writer.write(script);
+	  return writer;
+	};
+
+	module.exports = Output;
+
+
+/***/ },
 /* 27 */
 /***/ function(module, exports, __webpack_require__) {
 
@@ -18297,7 +18301,7 @@
 	bitcore.crypto.ECDSA = __webpack_require__(59);
 	bitcore.crypto.Hash = __webpack_require__(7);
 	bitcore.crypto.Random = __webpack_require__(33);
-	bitcore.crypto.Point = __webpack_require__(24);
+	bitcore.crypto.Point = __webpack_require__(25);
 	bitcore.crypto.Signature = __webpack_require__(13);
 
 	// encoding
@@ -18461,7 +18465,7 @@
 
 	var Signature = __webpack_require__(13);
 	var Script = __webpack_require__(9);
-	var Output = __webpack_require__(25);
+	var Output = __webpack_require__(26);
 	var BufferReader = __webpack_require__(18);
 	var BufferWriter = __webpack_require__(14);
 	var BN = __webpack_require__(6);
@@ -18766,7 +18770,7 @@
 
 	module.exports = Stream;
 
-	var EE = __webpack_require__(26).EventEmitter;
+	var EE = __webpack_require__(22).EventEmitter;
 	var inherits = __webpack_require__(151);
 
 	inherits(Stream, EE);
@@ -18934,7 +18938,7 @@
 
 	module.exports = Random;
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(22), __webpack_require__(1).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23), __webpack_require__(1).Buffer))
 
 /***/ },
 /* 34 */
@@ -19025,7 +19029,7 @@
 	var BN = __webpack_require__(6);
 	var JSUtil = __webpack_require__(4);
 	var Networks = __webpack_require__(19);
-	var Point = __webpack_require__(24);
+	var Point = __webpack_require__(25);
 	var PublicKey = __webpack_require__(12);
 	var Random = __webpack_require__(33);
 
@@ -19782,7 +19786,7 @@
 	module.exports = __webpack_require__(63);
 
 	module.exports.Input = __webpack_require__(42);
-	module.exports.Output = __webpack_require__(25);
+	module.exports.Output = __webpack_require__(26);
 	module.exports.UnspentOutput = __webpack_require__(64);
 	module.exports.Signature = __webpack_require__(44);
 
@@ -19811,7 +19815,7 @@
 	var JSUtil = __webpack_require__(4);
 	var Script = __webpack_require__(9);
 	var Sighash = __webpack_require__(29);
-	var Output = __webpack_require__(25);
+	var Output = __webpack_require__(26);
 
 	function Input(params) {
 	  if (!(this instanceof Input)) {
@@ -20462,7 +20466,7 @@
 
 
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer, __webpack_require__(22)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer, __webpack_require__(23)))
 
 /***/ },
 /* 47 */
@@ -20959,7 +20963,7 @@
 
 	module.exports = Transform;
 
-	var Duplex = __webpack_require__(23);
+	var Duplex = __webpack_require__(24);
 
 	/*<replacement>*/
 	var util = __webpack_require__(30);
@@ -21158,7 +21162,7 @@
 	}
 
 	function WritableState(options, stream) {
-	  var Duplex = __webpack_require__(23);
+	  var Duplex = __webpack_require__(24);
 
 	  options = options || {};
 
@@ -21246,7 +21250,7 @@
 	}
 
 	function Writable(options) {
-	  var Duplex = __webpack_require__(23);
+	  var Duplex = __webpack_require__(24);
 
 	  // Writable ctor is applied to Duplexes, though they're not
 	  // instanceof Writable, they're instanceof Readable.
@@ -21586,7 +21590,7 @@
 	  state.ended = true;
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(22)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23)))
 
 /***/ },
 /* 54 */
@@ -22464,7 +22468,7 @@
 	'use strict';
 
 	var Buffers = __webpack_require__(56);
-	var EventEmitter = __webpack_require__(26).EventEmitter;
+	var EventEmitter = __webpack_require__(22).EventEmitter;
 	var Net = __webpack_require__(67);
 	var Socks5Client = __webpack_require__(85);
 	var util = __webpack_require__(16);
@@ -23535,7 +23539,7 @@
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 	var BN = __webpack_require__(6);
-	var Point = __webpack_require__(24);
+	var Point = __webpack_require__(25);
 	var Signature = __webpack_require__(13);
 	var PublicKey = __webpack_require__(12);
 	var Random = __webpack_require__(33);
@@ -23847,7 +23851,7 @@
 	var Hash = __webpack_require__(7);
 	var Network = __webpack_require__(19);
 	var HDKeyCache = __webpack_require__(39);
-	var Point = __webpack_require__(24);
+	var Point = __webpack_require__(25);
 	var PrivateKey = __webpack_require__(35);
 	var Random = __webpack_require__(33);
 
@@ -24410,7 +24414,7 @@
 	var HDPrivateKey = __webpack_require__(60);
 	var HDKeyCache = __webpack_require__(39);
 	var Network = __webpack_require__(19);
-	var Point = __webpack_require__(24);
+	var Point = __webpack_require__(25);
 	var PublicKey = __webpack_require__(12);
 
 	var bitcoreErrors = __webpack_require__(15);
@@ -25690,7 +25694,7 @@
 	var Input = __webpack_require__(42);
 	var PublicKeyHashInput = Input.PublicKeyHash;
 	var MultiSigScriptHashInput = Input.MultiSigScriptHash;
-	var Output = __webpack_require__(25);
+	var Output = __webpack_require__(26);
 	var Script = __webpack_require__(9);
 	var PrivateKey = __webpack_require__(35);
 	var Block = __webpack_require__(57);
@@ -27012,7 +27016,7 @@
 	 * You can include this module with require('chrome-net')
 	 */
 
-	var EventEmitter = __webpack_require__(26).EventEmitter
+	var EventEmitter = __webpack_require__(22).EventEmitter
 	var inherits = __webpack_require__(118)
 	var ipaddr = __webpack_require__(119)
 	var is = __webpack_require__(117)
@@ -27880,7 +27884,7 @@
 	  return (x = Number(x)) >= 0 ? x : false
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(22), __webpack_require__(1).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23), __webpack_require__(1).Buffer))
 
 /***/ },
 /* 68 */
@@ -28218,7 +28222,7 @@
 
 	Readable.ReadableState = ReadableState;
 
-	var EE = __webpack_require__(26).EventEmitter;
+	var EE = __webpack_require__(22).EventEmitter;
 
 	/*<replacement>*/
 	if (!EE.listenerCount) EE.listenerCount = function(emitter, type) {
@@ -28249,7 +28253,7 @@
 	util.inherits(Readable, Stream);
 
 	function ReadableState(options, stream) {
-	  var Duplex = __webpack_require__(23);
+	  var Duplex = __webpack_require__(24);
 
 	  options = options || {};
 
@@ -28317,7 +28321,7 @@
 	}
 
 	function Readable(options) {
-	  var Duplex = __webpack_require__(23);
+	  var Duplex = __webpack_require__(24);
 
 	  if (!(this instanceof Readable))
 	    return new Readable(options);
@@ -29136,7 +29140,7 @@
 	  return -1;
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(22)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23)))
 
 /***/ },
 /* 78 */
@@ -29422,83 +29426,151 @@
 /* 80 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
+	'use strict';
 	var bitcorep2p = __webpack_require__(81),
 	    Pool = bitcorep2p.Pool,
 	    Messages = bitcorep2p.Messages,
 	    bitcore = __webpack_require__(27),
-	    BlockHeader = bitcore.BlockHeader;
+	    BlockHeader = bitcore.BlockHeader,
+	    bufferUtil = bitcore.util.buffer,
+	    EventEmitter = __webpack_require__(22).EventEmitter;
 
 
 	// from: https://github.com/voisine/breadwallet/blob/master/BreadWallet/BRPeerManager.m
-	var genesisBlockHash = new Buffer("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", 'hex');
-	//{"version":1,"prevHash":"6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000","merkleRoot":"982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e","time":1231469665,"bits":486604799,"nonce":2573394689}
-	var genesisBlockHeader = {
-	    version: 1,
-	    prevHash: new Buffer('0000000000000000000000000000000000000000000000000000000000000000','hex'),
-	    merkleRoot: new Buffer('4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b','hex'),
-	    time:'1231006505',
-	    bits: '486604799',
-	    nonce: 2083236893,
-	};
-	//console.log('genesis:',genesisBlockHeader);
+	//var genesisBlockHash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f";
+	// TODO: For now, use arbitrary block 343000 as starting point
+	var STARTING_BLOCK_HEIGHT = 330000;
+	var STARTING_BLOCK_HASH = "00000000000000000faabab19f17c0178c754dbed023e6c871dcaf74159c5f02"
+	// Breadwallet uses 3, so that's good enough for us?!
+	Pool.MaxConnectedPeers = 3;
 
-	var lastBlock = 0;
-	var bestHeightSeen = 0;
 
-	// Store the chain here for now!
-	var blockChain = []
+	function PeerManager() {
+	    this.connected = false;
+	    //this.lastBlockHeight = 0;
+	    // last block height reported by current download peer
+	    this.peerCount = 0;
+	    this.pool = null;
+	    this.peers = [];
+	    this.downloadPeer = null;
+	    // TODO: Store the chain here for now!
+	    this.blockChain = [];
+	}
 
-	Pool.MaxConnectedPeers = 1;
-	var pool = new Pool();
+	PeerManager.prototype.connect = function() {
+	    var self = this;
 
-	module.exports.run = function() {
+	    self.pool = new Pool();
+	    self.pool.on('peerready', self.peerConnected.bind(this));
+	    self.pool.on('peeraddrdisconnect', self.peerDisconnected.bind(this));
+	    self.pool.on('peerheaders', self.peerHeaders.bind(this));
+	    
+	    // TODO:
+	    self.pool.on('peerinv', self.peerInv.bind(this));
+	    self.pool.on('peertx', self.peerTx.bind(this));
+	    self.pool.on('peerping', self.peerPing.bind(this));
+	    
+	    self.pool.connect();
+	    this.connected = true;
 
-	    //pool.on('seed', function(ips) { console.log('seed! '); });
-	    //pool.on('seederror', function(err) { console.log('seederror ', err); });
-	    //pool.on('peerinv', function(peer, message) { console.log('perinv!', message); });
-	    pool.on('peerheaders', function(peer, message) {
-	        //console.log('peerheaders!', message.headers);
-	        for(var i in message.headers) {
-	            var blockHeader = BlockHeader(message.headers[i]);
-	            //blockHeader.version=1;
-	            //if(blockHeader.version == 1 ) {
-	            console.log('header: ', blockHeader.toJSON(), blockHeader.hash);
-	            //}
-	            if(i > 20) { break; }
-	        }
-	    });
-	    pool.on('peerready', function(peer, addr) {
-	        console.log('connected: ', addr.ip.v4);
-	        if (peer.bestHeight > bestHeightSeen) {
-	            bestHeightSeen = peer.bestHeight;
-	        }
-	        var latestHeader = genesisBlockHash;
-	        if(blockChain[-1]){
-	            console.log(blockChain[-1]);
-	            latestHeader = blockChain[-1].merkleRoot.toString('hex');
-	        }
-	        var getHeadersMsg = new Messages.GetHeaders([genesisBlockHash]);
-	        peer.sendMessage(getHeadersMsg);
-	    });
-	    pool.on('peeraddrdisconnect', function(peer, addr) {
-	        console.log('removing', addr.hash);
-	    });
-	    //pool.on('peertx', function(peer, message) { console.log('peertx: ', peer, ', Message: ', message); });
-	    //pool.on('peerping', function(peer, message) { console.log('peeraddr: ', peer, ', Message: ', message); });
-	    pool.connect();
 
 	}
 
-	module.exports.stop = function() {
-	    pool.disconnect();
+	PeerManager.prototype.peerConnected = function(peer, addr) {
+	    var self = this;
+	    console.log('connected: ', addr.ip.v4);
+	    //TODO: Smarter peerDownload detection
+	    if(!self.downloadPeer) {
+	        self._setDownloadPeer(peer);
+	    }
+	    self.peers.push(peer);
 	}
 
-	setTimeout(function(){
-	    console.log('bestHeightSeen:', bestHeightSeen);
-	},2000);
-	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+	PeerManager.prototype.peerDisconnected = function(peer, addr) {
+	    console.log('removing', addr.hash);
+	    for(var i in self.peers) {
+	        if(peer.host == self.peers[i].host){
+	            self.peers.splice(i-1,1);
+	            break;
+	        }
+	    }
+	}
+
+	PeerManager.prototype.peerInv = function(peer, message) {
+	    console.log('peerinv', message);
+	}
+
+	PeerManager.prototype.peerTx = function(peer, message) {
+	    console.log('peertx', message);
+	}
+
+	PeerManager.prototype.peerPing = function(peer, message) {
+	    console.log('peerping', message);
+	}
+
+	PeerManager.prototype.peerHeaders = function(peer, message) {
+	    var self = this;
+	    console.log('headers response');
+	    for(var i in message.headers) {
+	        var blockHeader = new BlockHeader(message.headers[i]);
+	        if(blockHeader.validProofOfWork()) {
+	            var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
+	            var latestBlock = self.blockChain[self.blockChain.length-1];
+	            if(!self.blockChain.length && blockHeader.hash) {
+	                console.log('got first block');
+	                self.blockChain.push(blockHeader);
+	            } else if (latestBlock && prevHash == latestBlock.hash) {
+	                self.blockChain.push(blockHeader);
+	            } else {
+	                console.log('block didnt go on chain');
+	            }
+	        }
+	    }
+
+	    // If we still have more messages to get
+	    if(self.syncedHeight() < self.estimatedBlockHeight()) {
+	        console.log('getting more headers');
+	        var lastHeader = message.headers[message.headers.length - 1];
+	        peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
+	    }
+	}
+
+	PeerManager.prototype.disconnect = function() {
+	    this.pool.disconnect();
+	}
+
+	PeerManager.prototype.syncProgress = function() {
+	    var self = this;
+	    console.log('estimatedBlockHeight',self.estimatedBlockHeight(), self.syncedHeight());
+	    //TODO: this is really crude and crappy atm
+	    return self.blockChain.length /
+	        (self.estimatedBlockHeight() - STARTING_BLOCK_HEIGHT)
+	}
+
+	PeerManager.prototype.estimatedBlockHeight = function() {
+	    var self = this;
+	    if(!self.downloadPeer) {
+	        return 0;
+	    }
+	    return self.downloadPeer.bestHeight;
+	}
+
+	PeerManager.prototype.syncedHeight = function() {
+	    var self = this;
+	    return STARTING_BLOCK_HEIGHT + self.blockChain.length;
+	}
+
+	PeerManager.prototype._setDownloadPeer = function(peer) {
+	    var self = this;
+	    console.log('setting download peer');
+	    self.downloadPeer = peer;
+	    // TODO: For now we always just start with startingBlock, fix that
+	    peer.sendMessage( new Messages.GetHeaders([STARTING_BLOCK_HASH]) );
+	}
+
+
+	module.exports = PeerManager;
+
 
 /***/ },
 /* 81 */
@@ -29531,7 +29603,7 @@
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 	var dns = __webpack_require__(79);
-	var EventEmitter = __webpack_require__(26).EventEmitter;
+	var EventEmitter = __webpack_require__(22).EventEmitter;
 
 	var bitcore = __webpack_require__(27);
 	var Networks = bitcore.Networks;
@@ -29942,7 +30014,7 @@
 	/*jshint node:true*/
 
 	var net = __webpack_require__(67);
-	var EventEmitter = __webpack_require__(26).EventEmitter;
+	var EventEmitter = __webpack_require__(22).EventEmitter;
 	var inherits = __webpack_require__(16).inherits;
 
 	var htons = __webpack_require__(90).htons;
@@ -34609,7 +34681,7 @@
 	var _ = __webpack_require__(2);
 	var inherits = __webpack_require__(21);
 	var Input = __webpack_require__(43);
-	var Output = __webpack_require__(25);
+	var Output = __webpack_require__(26);
 	var $ = __webpack_require__(5);
 
 	var Script = __webpack_require__(9);
@@ -34785,7 +34857,7 @@
 
 	var Hash = __webpack_require__(7);
 	var Input = __webpack_require__(43);
-	var Output = __webpack_require__(25);
+	var Output = __webpack_require__(26);
 	var Sighash = __webpack_require__(29);
 	var Script = __webpack_require__(9);
 	var Signature = __webpack_require__(13);
@@ -42981,7 +43053,7 @@
 /* 145 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(23)
+	module.exports = __webpack_require__(24)
 
 
 /***/ },
@@ -43008,7 +43080,7 @@
 	exports.Stream = __webpack_require__(32);
 	exports.Readable = exports;
 	exports.Writable = __webpack_require__(53);
-	exports.Duplex = __webpack_require__(23);
+	exports.Duplex = __webpack_require__(24);
 	exports.Transform = __webpack_require__(52);
 	exports.PassThrough = __webpack_require__(76);
 
