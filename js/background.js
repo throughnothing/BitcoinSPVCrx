@@ -11,7 +11,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
     var pm = new PeerManager();
     pm.connect();
     var progressInterval = setInterval(function(){
-        console.log('syncProgress:', pm.syncProgress());
+        console.log('syncProgress:', pm.syncProgress(), 'height:',pm.syncedHeight());
     }, 2000);
 
     chrome.app.window.create(

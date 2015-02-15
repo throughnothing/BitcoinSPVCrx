@@ -19,13 +19,13 @@ Pool.MaxConnectedPeers = 3;
 
 function PeerManager() {
     this.connected = false;
-    //this.lastBlockHeight = 0;
     // last block height reported by current download peer
-    this.peerCount = 0;
     this.pool = null;
     this.peers = [];
     this.downloadPeer = null;
-    // TODO: Store the chain here for now!
+    this._bestHeight = 0;
+
+    // TODO: Store this somewhere better
     this.knownBlockHashes = [];
 }
 
@@ -33,8 +33,9 @@ PeerManager.prototype.connect = function() {
     var self = this;
 
     self.pool = new Pool();
-    self.pool.on('peerready', self.peerConnected.bind(this));
-    self.pool.on('peeraddrdisconnect', self.peerDisconnected.bind(this));
+    self.pool.on('peerconnect', self.peerConnected.bind(this));
+    self.pool.on('peerready', self.peerReady.bind(this));
+    self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
     self.pool.on('peerheaders', self.peerHeaders.bind(this));
     
     // TODO:
@@ -49,10 +50,26 @@ PeerManager.prototype.connect = function() {
 
 }
 
-PeerManager.prototype.peerConnected = function(peer, addr) {
+PeerManager.prototype.peerConnected = function(peer) {
     var self = this;
+    console.log('peerConnected');
     self.peers.push(peer);
-    console.log('connected: ', addr.ip.v4);
+
+    // Only wait 2 seconds for verAck
+    var peerTimeout = setTimeout(function() {
+        console.log('peer timed out, disconnecting');
+        peer.disconnect();
+    },2000);
+
+    // Clear timeout once peer is ready
+    peer.on('ready', function() { clearTimeout(peerTimeout); });
+}
+
+PeerManager.prototype.peerReady = function(peer, addr) {
+    var self = this;
+
+    self._bestHeight = Math.max(self._bestHeight, peer.bestHeight);
+    console.log('peerReady: ', addr.ip.v4);
     //TODO: Smarter peerDownload detection
     if(!self.downloadPeer) {
         self._setDownloadPeer(peer);
@@ -70,9 +87,13 @@ PeerManager.prototype.peerConnected = function(peer, addr) {
 
 PeerManager.prototype.peerDisconnected = function(peer, addr) {
     var self = this;
-    console.log('removing', addr.hash);
+    console.log('removing:', addr.hash);
     for(var i in self.peers) {
         if(peer.host == self.peers[i].host){
+            if(peer == self.downloadPeer){
+                // TODO: is this good enough, or do we need to re-set it here?
+                self.downloadPeer = null;
+            }
             self.peers.splice(i-1,1);
             break;
         }
@@ -124,8 +145,9 @@ PeerManager.prototype.peerPing = function(peer, message) {
     // TODO: pong?
 }
 
-PeerManager.prototype.peerError = function(peer) {
-    console.log('peererror');
+PeerManager.prototype.peerError = function(peer, e) {
+    console.log('peererror', e);
+    peer.disconnect();
 }
 
 PeerManager.prototype.peerHeaders = function(peer, message) {
@@ -164,7 +186,6 @@ PeerManager.prototype.disconnect = function() {
 
 PeerManager.prototype.syncProgress = function() {
     var self = this;
-    console.log('estimatedBlockHeight',self.estimatedBlockHeight(), self.syncedHeight());
     //TODO: this is really crude and crappy atm
     return self.knownBlockHashes.length /
         (self.estimatedBlockHeight() - STARTING_BLOCK_HEIGHT)
@@ -175,7 +196,7 @@ PeerManager.prototype.estimatedBlockHeight = function() {
     if(!self.downloadPeer) {
         return 0;
     }
-    return self.downloadPeer.bestHeight;
+    return Math.max(self.downloadPeer.bestHeight, self.syncedHeight());
 }
 
 PeerManager.prototype.syncedHeight = function() {
@@ -183,9 +204,23 @@ PeerManager.prototype.syncedHeight = function() {
     return STARTING_BLOCK_HEIGHT + self.knownBlockHashes.length;
 }
 
+PeerManager.prototype.bestHeight = function() {
+    var self = this;
+    return Math.max(self.syncedHeight(), self._bestHeight)
+}
+
 PeerManager.prototype.getLatestBlockHash = function() {
     var self = this;
     return self.knownBlockHashes[self.knownBlockHashes.length -1]
+}
+
+PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
+    var self = this;
+    // TODO:
+    //if (blockHeight > self.syncedBlockHeight()) {
+        //// future block, assume 10 minutes per block after last block
+        //return self.lastBlock.timestamp + (blockHeight - self.lastBlockHeight)*10*60;
+    //}
 }
 
 PeerManager.prototype._setDownloadPeer = function(peer) {
