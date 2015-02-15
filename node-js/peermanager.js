@@ -1,16 +1,10 @@
 'use strict';
-var PeerManager = require('./peermanager');
+var PeerManager = require('../js/peermanager');
 var pm = new PeerManager();
-pm.on('syncing', function(pm) {
-    var syncUpdate = setInterval(function(){
-        var progress = pm.syncProgress();
-        var height = pm.syncedHeight();
-        console.log('syncProgress:', progress, 'height:', height);
-        if(progress >= 1) {
-            clearInterval(syncUpdate);
-        }
-    }, 2000);
-
+pm.on('syncprogress', function(progress) {
+    var height = pm.syncedHeight();
+    console.log('syncProgress:', progress, 'height:', height);
 });
+pm.on('synccomplete', function() { console.log('syncComplete!'); });
 pm.connect();
 
