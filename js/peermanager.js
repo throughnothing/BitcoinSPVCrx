@@ -38,6 +38,7 @@ function PeerManager() {
     this.pool = null;
     this.peers = [];
     this.downloadPeer = null;
+    this.knownBlockHashes = [];
     // TODO: Store this somewhere better
     this.blocks = [];
 
@@ -58,9 +59,18 @@ PeerManager.prototype.connect = function() {
     self.pool.on('peerinv', self.peerInv.bind(this));
     self.pool.on('peertx', self.peerTx.bind(this));
     self.pool.on('peererror', self.peerError.bind(this));
-    
+
     self.pool.connect();
     self.connected = true;
+    
+    // TODO: figure out why this is needed
+    var readyTo = setTimeout(function(){
+        console.log('pool reconnecting');
+        self.disconnect();
+        self.connect();
+    },3000);
+    self.pool.once('peerready', function() { clearTimeout(readyTo); });
+    
 }
 
 PeerManager.prototype.peerConnected = function(peer) {
@@ -139,11 +149,12 @@ PeerManager.prototype.peerInv = function(peer, message) {
     }
 
     if(blockHashes.length == 1 &&
-            self.getLatestBlockHash() == blockHashes[0].toString('hex')) {
+            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex'))) {
         console.log('already had latest block, ignoring');
         blockHashes = [];
     }
-    if(blockHashes.length == 1 && self.syncProgress() >= 1) {
+    if(blockHashes.length == 1) {
+        self.knownBlockHashes.push(blockHashes[0]);
         console.log('got new block!', blockHashes[0]);
         self.emit('syncstarted', self);
         peer.sendMessage(
@@ -188,7 +199,7 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
     self.emit('syncprogress', self.syncProgress());
     // If we still have more messages to get
     if(self.syncedHeight() < self.estimatedBlockHeight()) {
-        console.log('getting more headers');
+        //console.log('getting more headers');
         var lastHeader = message.headers[message.headers.length - 1];
         peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
     } else {
