@@ -10,9 +10,17 @@ var PeerManager = require('./peermanager');
 chrome.app.runtime.onLaunched.addListener(function() {
     var pm = new PeerManager();
     pm.connect();
-    var progressInterval = setInterval(function(){
-        console.log('syncProgress:', pm.syncProgress(), 'height:',pm.syncedHeight());
-    }, 2000);
+    pm.on('syncing', function(pm) {
+        var syncUpdate = setInterval(function(){
+            var progress = pm.syncProgress();
+            var height = pm.syncedHeight();
+            console.log('syncProgress:', progress, 'height:', height);
+            if(progress >= 1) {
+                console.log('Fully Synced!');
+                clearInterval(syncUpdate);
+            }
+        }, 2000);
+    });
 
     chrome.app.window.create(
       "html/index.html",
