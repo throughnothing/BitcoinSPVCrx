@@ -188,7 +188,8 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
             } else if (prevHash == self.getLatestBlockHash()) {
                 self.blocks.push(blockHeader.hash);
             } else {
-                console.log('block didnt go on chain');
+                // TODO: do something better here?
+                //console.log('block didnt go on chain');
             }
             var syncedHeight = self.syncedHeight();
             if(syncedHeight > self.bestHeight) {
