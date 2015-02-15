@@ -55,10 +55,11 @@
 	 */
 	chrome.app.runtime.onLaunched.addListener(function() {
 	    var pm = new PeerManager();
+	    pm.on('syncprogress', function(progress) {
+	        console.log('syncProgress:', progress, 'height:', pm.syncedHeight());
+	    });
+	    pm.on('synccomplete', function() { console.log('syncComplete!'); });
 	    pm.connect();
-	    var progressInterval = setInterval(function(){
-	        console.log('syncProgress:', pm.syncProgress(), 'height:',pm.syncedHeight());
-	    }, 2000);
 
 	    chrome.app.window.create(
 	      "html/index.html",
@@ -69,7 +70,6 @@
 	      function(window) {
 	          window.onClosed.addListener(function() {
 	              pm.disconnect();
-	              clearInterval(progressInterval);
 	              console.log('Shut down.');
 	          });
 	      }
@@ -29434,49 +29434,71 @@
 	    bitcore = __webpack_require__(27),
 	    BlockHeader = bitcore.BlockHeader,
 	    bufferUtil = bitcore.util.buffer,
-	    EventEmitter = __webpack_require__(22).EventEmitter;
+	    EventEmitter = __webpack_require__(22).EventEmitter,
+	    util = __webpack_require__(16);
 
 
-	// from: https://github.com/voisine/breadwallet/blob/master/BreadWallet/BRPeerManager.m
-	//var genesisBlockHash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f";
-	// TODO: For now, use arbitrary block 343000 as starting point
-	var STARTING_BLOCK_HEIGHT = 330000;
-	var STARTING_BLOCK_HASH = "00000000000000000faabab19f17c0178c754dbed023e6c871dcaf74159c5f02"
 	// Breadwallet uses 3, so that's good enough for us?!
 	Pool.MaxConnectedPeers = 3;
+	var MAX_GETDATA_HASHES = 50000;
+	// Random checkpoitns to use, most of these from Breadwallet BRPeerManager.m
+	var CHECKPOINTS = [
+	    [      0, "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943" ],
+	    [  20160, "000000001cf5440e7c9ae69f655759b17a32aad141896defd55bb895b7cfc44e" ],
+	    [  40320, "000000008011f56b8c92ff27fb502df5723171c5374673670ef0eee3696aee6d" ],
+	    [  60480, "00000000130f90cda6a43048a58788c0a5c75fa3c32d38f788458eb8f6952cee" ],
+	    [  80640, "00000000002d0a8b51a9c028918db3068f976e3373d586f08201a4449619731c" ],
+	    [ 100800, "0000000000a33112f86f3f7b0aa590cb4949b84c2d9c673e9e303257b3be9000" ],
+	    [ 120960, "00000000003367e56e7f08fdd13b85bbb31c5bace2f8ca2b0000904d84960d0c" ],
+	    [ 141120, "0000000007da2f551c3acd00e34cc389a4c6b6b3fad0e4e67907ad4c7ed6ab9f" ],
+	    [ 161280, "0000000001d1b79a1aec5702aaa39bad593980dfe26799697085206ef9513486" ],
+	    [ 181440, "00000000002bb4563a0ec21dc4136b37dcd1b9d577a75a695c8dd0b861e1307e" ],
+	    [ 200000, "000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf" ], // Custom
+	    [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38" ],
+	    [ 250000, "000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214" ], // Custom
+	    [ 300000, "000000000000000082ccf8f1557c5d40b21edabb18d2d691cfbf87118bac7254" ], // Custom
+	];
+	// TODO: base this on wallet start time (?)
+	var STARTING_CHECKPOINT = CHECKPOINTS[13];
 
 
 	function PeerManager() {
 	    this.connected = false;
-	    // last block height reported by current download peer
 	    this.pool = null;
 	    this.peers = [];
 	    this.downloadPeer = null;
-	    this._bestHeight = 0;
-
-	    // TODO: Store this somewhere better
 	    this.knownBlockHashes = [];
+	    // TODO: Store this somewhere better
+	    this.blocks = [];
+
+	    this._bestHeight = 0;
 	}
+
+	util.inherits(PeerManager, EventEmitter);
 
 	PeerManager.prototype.connect = function() {
 	    var self = this;
+	    if(self.connected) return;
 
 	    self.pool = new Pool();
 	    self.pool.on('peerconnect', self.peerConnected.bind(this));
 	    self.pool.on('peerready', self.peerReady.bind(this));
 	    self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
 	    self.pool.on('peerheaders', self.peerHeaders.bind(this));
-	    
-	    // TODO:
 	    self.pool.on('peerinv', self.peerInv.bind(this));
 	    self.pool.on('peertx', self.peerTx.bind(this));
-	    self.pool.on('peerping', self.peerPing.bind(this));
 	    self.pool.on('peererror', self.peerError.bind(this));
-	    
+
 	    self.pool.connect();
-	    this.connected = true;
-
-
+	    self.connected = true;
+	    
+	    // TODO: figure out why this is needed
+	    var readyTo = setTimeout(function(){
+	        console.log('pool reconnecting');
+	        self.disconnect();
+	        self.connect();
+	    },3000);
+	    self.pool.once('peerready', function() { clearTimeout(readyTo); });
 	}
 
 	PeerManager.prototype.peerConnected = function(peer) {
@@ -29489,9 +29511,9 @@
 	        console.log('peer timed out, disconnecting');
 	        peer.disconnect();
 	    },2000);
-
 	    // Clear timeout once peer is ready
 	    peer.on('ready', function() { clearTimeout(peerTimeout); });
+	    self.emit('peerconnect', self.peers.length)
 	}
 
 	PeerManager.prototype.peerReady = function(peer, addr) {
@@ -29510,28 +29532,31 @@
 	            self.downloadPeer.disconnect();
 	            self._setDownloadPeer(peer);
 	        }
-
 	    }
 	}
 
 	PeerManager.prototype.peerDisconnected = function(peer, addr) {
 	    var self = this;
-	    console.log('removing:', addr.hash);
-	    for(var i in self.peers) {
-	        if(peer.host == self.peers[i].host){
-	            if(peer == self.downloadPeer){
-	                // TODO: is this good enough, or do we need to re-set it here?
-	                self.downloadPeer = null;
-	            }
-	            self.peers.splice(i-1,1);
-	            break;
-	        }
+	    console.log('removing:', addr.ip.v4);
+	    var idx = self.peers.indexOf(peer);
+	    if(idx && self.peers[idx] == self.downloadPeer){
+	        console.log('unsetting downloadPeer');
+	        // TODO: is this good enough, or do we need to re-set it here?
+	        self.downloadPeer = null;
 	    }
+	    self.peers.splice(idx-1,1);
+	    self.emit('peerdisconnect', self.peers.length)
 	}
 
 	PeerManager.prototype.peerInv = function(peer, message) {
 	    var self = this;
 	    var txHashes = [], blockHashes = [];
+
+	    if(message.count > MAX_GETDATA_HASHES) {
+	        console.log('inv message has too many items, dropping.');
+	        return;
+	    }
+
 	    for(var i in message.inventory) {
 	        switch(message.inventory[i].type) {
 	            case 1: // TX
@@ -29554,12 +29579,14 @@
 	    }
 
 	    if(blockHashes.length == 1 &&
-	            self.getLatestBlockHash() == blockHashes[0].toString('hex')) {
+	            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex')) > -1) {
 	        console.log('already had latest block, ignoring');
 	        blockHashes = [];
 	    }
 	    if(blockHashes.length == 1) {
+	        self.knownBlockHashes.push(blockHashes[0]);
 	        console.log('got new block!', blockHashes[0]);
+	        self.emit('syncstarted', self);
 	        peer.sendMessage(
 	            new Messages.GetHeaders([self.getLatestBlockHash()]));
 	    }
@@ -29567,11 +29594,6 @@
 
 	PeerManager.prototype.peerTx = function(peer, message) {
 	    console.log('peertx', message);
-	}
-
-	PeerManager.prototype.peerPing = function(peer, message) {
-	    //console.log('peerping', message);
-	    // TODO: pong?
 	}
 
 	PeerManager.prototype.peerError = function(peer, e) {
@@ -29584,13 +29606,16 @@
 	    console.log('headers response');
 	    for(var i in message.headers) {
 	        var blockHeader = new BlockHeader(message.headers[i]);
+	        // TODO: This won't handle chain forks, it'll just accept the first
+	        // valid proof on top of the current chain.  It won't be able to find
+	        // another chain that grows longer than the first one seen.
 	        if(blockHeader.validProofOfWork()) {
 	            var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
-	            if(!self.knownBlockHashes.length && blockHeader.hash) {
+	            if(!self.blocks.length && blockHeader.hash) {
 	                // First block
-	                self.knownBlockHashes.push(blockHeader.hash);
+	                self.blocks.push(blockHeader.hash);
 	            } else if (prevHash == self.getLatestBlockHash()) {
-	                self.knownBlockHashes.push(blockHeader.hash);
+	                self.blocks.push(blockHeader.hash);
 	            } else {
 	                console.log('block didnt go on chain');
 	            }
@@ -29601,23 +29626,27 @@
 	        }
 	    }
 
+	    self.emit('syncprogress', self.syncProgress());
 	    // If we still have more messages to get
 	    if(self.syncedHeight() < self.estimatedBlockHeight()) {
-	        console.log('getting more headers');
+	        //console.log('getting more headers');
 	        var lastHeader = message.headers[message.headers.length - 1];
 	        peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
+	    } else {
+	        self.emit('synccomplete', self);
 	    }
 	}
 
 	PeerManager.prototype.disconnect = function() {
+	    this.connected=false;
 	    this.pool.disconnect();
 	}
 
 	PeerManager.prototype.syncProgress = function() {
 	    var self = this;
 	    //TODO: this is really crude and crappy atm
-	    return self.knownBlockHashes.length /
-	        (self.estimatedBlockHeight() - STARTING_BLOCK_HEIGHT)
+	    return self.blocks.length /
+	        (self.estimatedBlockHeight() - STARTING_CHECKPOINT[0])
 	}
 
 	PeerManager.prototype.estimatedBlockHeight = function() {
@@ -29625,12 +29654,12 @@
 	    if(!self.downloadPeer) {
 	        return 0;
 	    }
-	    return Math.max(self.downloadPeer.bestHeight, self.syncedHeight());
+	    return Math.max(self._bestHeight, self.syncedHeight());
 	}
 
 	PeerManager.prototype.syncedHeight = function() {
 	    var self = this;
-	    return STARTING_BLOCK_HEIGHT + self.knownBlockHashes.length;
+	    return STARTING_CHECKPOINT[0] + self.blocks.length;
 	}
 
 	PeerManager.prototype.bestHeight = function() {
@@ -29640,7 +29669,7 @@
 
 	PeerManager.prototype.getLatestBlockHash = function() {
 	    var self = this;
-	    return self.knownBlockHashes[self.knownBlockHashes.length -1]
+	    return self.blocks[self.blocks.length -1]
 	}
 
 	PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
@@ -29654,10 +29683,10 @@
 
 	PeerManager.prototype._setDownloadPeer = function(peer) {
 	    var self = this;
-	    console.log('setting download peer');
+	    self.emit('syncstarted', self);
 	    self.downloadPeer = peer;
 	    // TODO: For now we always just start with startingBlock, fix that
-	    peer.sendMessage( new Messages.GetHeaders([STARTING_BLOCK_HASH]) );
+	    peer.sendMessage( new Messages.GetHeaders([STARTING_CHECKPOINT[1]]) );
 	}
 
 
@@ -29841,7 +29870,8 @@
 	 * @param {Object} addr - An addr from the list of addrs
 	 */
 	Pool.prototype._removeConnectedPeer = function _removeConnectedPeer(addr) {
-	  if (this._connectedPeers[addr.hash].status !== Peer.STATUS.DISCONNECTED) {
+	  if (this._connectedPeers[addr.hash] &&
+	      this._connectedPeers[addr.hash].status !== Peer.STATUS.DISCONNECTED) {
 	    this._connectedPeers[addr.hash].disconnect();
 	  } else {
 	    delete this._connectedPeers[addr.hash];
@@ -40444,15 +40474,15 @@
 		"license": "MIT",
 		"readme": "P2P Networking capabilities for bitcore\n=======\n\n[![NPM Package](https://img.shields.io/npm/v/bitcore-p2p.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-p2p)\n[![Build Status](https://img.shields.io/travis/bitpay/bitcore-p2p.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-p2p)\n[![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-p2p.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-p2p?branch=master)\n\nbitcore-p2p adds support for connecting to the bitcoin p2p network in [Node.js](http://nodejs.org/).\n\nSee [the main bitcore repo](https://github.com/bitpay/bitcore) for more information.\n\n## Getting Started\n\n```sh\nnpm install bitcore-p2p\n```\nIn order to connect to the bitcore network, you'll need to know the IP address of at least one node of the network. You can do that by using the known DNS servers. Then, you can connect to it:\n\n```javascript\nvar Peer = require('bitcore-p2p').Peer;\n\nvar peer = new Peer('0.0.0.0');\n\npeer.on('ready', function() {\n  // peer info\n  console.log(peer.version, peer.subversion, peer.bestHeight);\n});\npeer.on('disconnect', function() {\n  console.log('connection closed');\n});\npeer.connect();\n```\n\nThen, you can get information from other peers by using:\n\n```javascript\n// handle events\npeer.on('inv', function(message) {\n  // message.inventory[]\n});\npeer.on('tx', function(message) {\n  // message.transaction\n});\n```\n\nTake a look at the [bitcore guide](http://bitcore.io/guide/peer.html) on the usage of the `Peer` class.\n\n## Contributing\n\nSee [CONTRIBUTING.md](https://github.com/bitpay/bitcore) on the main bitcore repo for information about how to contribute.\n\n## License\n\nCode released under [the MIT license](https://github.com/bitpay/bitcore/blob/master/LICENSE).\n\nCopyright 2013-2015 BitPay, Inc. Bitcore is a trademark maintained by BitPay, Inc.\n\n",
 		"readmeFilename": "README.md",
-		"gitHead": "03185766a9d93ab1bdfa1702239b82bb9093ecb2",
+		"gitHead": "9d8ab60483513d9d60717e1cd3e18cab2f76840e",
 		"bugs": {
 			"url": "https://github.com/bitpay/bitcore-p2p/issues"
 		},
 		"homepage": "https://github.com/bitpay/bitcore-p2p",
 		"_id": "bitcore-p2p@0.10.0",
-		"_shasum": "4eee62a3452c9481de08cdd14eac5207ad29bd8b",
-		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-52682-ec76915c/git-cache-0a9d72307ae6/03185766a9d93ab1bdfa1702239b82bb9093ecb2",
-		"_resolved": "git://github.com/throughnothing/bitcore-p2p.git#03185766a9d93ab1bdfa1702239b82bb9093ecb2"
+		"_shasum": "343e740aeff4cb721a828094419c1e8a7dbfa83c",
+		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-58131-acf72974/git-cache-ad102613ce79/9d8ab60483513d9d60717e1cd3e18cab2f76840e",
+		"_resolved": "git://github.com/throughnothing/bitcore-p2p.git#9d8ab60483513d9d60717e1cd3e18cab2f76840e"
 	}
 
 /***/ },
