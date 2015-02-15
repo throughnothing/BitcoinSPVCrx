@@ -24,7 +24,6 @@ chrome.app.runtime.onLaunched.addListener(function() {
       function(window) {
           window.onClosed.addListener(function() {
               pm.disconnect();
-              clearInterval(progressInterval);
               console.log('Shut down.');
           });
       }

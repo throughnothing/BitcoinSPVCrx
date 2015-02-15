@@ -70,7 +70,6 @@ PeerManager.prototype.connect = function() {
         self.connect();
     },3000);
     self.pool.once('peerready', function() { clearTimeout(readyTo); });
-    
 }
 
 PeerManager.prototype.peerConnected = function(peer) {
@@ -85,6 +84,7 @@ PeerManager.prototype.peerConnected = function(peer) {
     },2000);
     // Clear timeout once peer is ready
     peer.on('ready', function() { clearTimeout(peerTimeout); });
+    self.emit('peerconnect', self.peers.length)
 }
 
 PeerManager.prototype.peerReady = function(peer, addr) {
@@ -116,6 +116,7 @@ PeerManager.prototype.peerDisconnected = function(peer, addr) {
         self.downloadPeer = null;
     }
     self.peers.splice(idx-1,1);
+    self.emit('peerdisconnect', self.peers.length)
 }
 
 PeerManager.prototype.peerInv = function(peer, message) {
@@ -149,7 +150,7 @@ PeerManager.prototype.peerInv = function(peer, message) {
     }
 
     if(blockHashes.length == 1 &&
-            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex'))) {
+            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex')) > -1) {
         console.log('already had latest block, ignoring');
         blockHashes = [];
     }
