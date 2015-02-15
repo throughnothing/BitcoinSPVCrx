@@ -2,10 +2,13 @@
 var webpack = require('webpack');
 
 module.exports = {
-    entry: './js/background',
+    entry: {
+      background: './js/background',
+      app: './js/app'
+    },
     output: {
         path: __dirname + '/build/js',
-        filename: 'background.js'
+        filename: '[name].js'
     },
     resolve: {
         extensions: ['', '.js', '.jsx', '.json'],

@@ -174,7 +174,7 @@ PeerManager.prototype.peerError = function(peer, e) {
 
 PeerManager.prototype.peerHeaders = function(peer, message) {
     var self = this;
-    console.log('headers response');
+    //console.log('headers response');
     for(var i in message.headers) {
         var blockHeader = new BlockHeader(message.headers[i]);
         // TODO: This won't handle chain forks, it'll just accept the first
