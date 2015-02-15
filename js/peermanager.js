@@ -5,7 +5,8 @@ var bitcorep2p = require('bitcore-p2p'),
     bitcore = require('bitcore'),
     BlockHeader = bitcore.BlockHeader,
     bufferUtil = bitcore.util.buffer,
-    EventEmitter = require('events').EventEmitter;
+    EventEmitter = require('events').EventEmitter,
+    util = require('util');
 
 
 // from: https://github.com/voisine/breadwallet/blob/master/BreadWallet/BRPeerManager.m
@@ -28,6 +29,8 @@ function PeerManager() {
     // TODO: Store this somewhere better
     this.knownBlockHashes = [];
 }
+
+util.inherits(PeerManager, EventEmitter);
 
 PeerManager.prototype.connect = function() {
     var self = this;
@@ -60,7 +63,6 @@ PeerManager.prototype.peerConnected = function(peer) {
         console.log('peer timed out, disconnecting');
         peer.disconnect();
     },2000);
-
     // Clear timeout once peer is ready
     peer.on('ready', function() { clearTimeout(peerTimeout); });
 }
@@ -81,7 +83,6 @@ PeerManager.prototype.peerReady = function(peer, addr) {
             self.downloadPeer.disconnect();
             self._setDownloadPeer(peer);
         }
-
     }
 }
 
@@ -131,6 +132,7 @@ PeerManager.prototype.peerInv = function(peer, message) {
     }
     if(blockHashes.length == 1) {
         console.log('got new block!', blockHashes[0]);
+        self.emit('syncing', self);
         peer.sendMessage(
             new Messages.GetHeaders([self.getLatestBlockHash()]));
     }
@@ -177,6 +179,8 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
         console.log('getting more headers');
         var lastHeader = message.headers[message.headers.length - 1];
         peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
+    } else {
+        self.emit('synced', self);
     }
 }
 
