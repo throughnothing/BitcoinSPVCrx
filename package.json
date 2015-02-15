@@ -11,7 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "bitcore": "^0.10.3",
-    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#1a7e7e0a81ba8953f8e0790a48a5617731874d48",
+    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#a565eddae0bef27527e39fa3e5c67a057f6c18cc",
     "chrome-dgram": "^2.1.0",
     "chrome-net": "^2.4.0",
     "json-loader": "^0.5.1"
