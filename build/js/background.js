@@ -56,8 +56,8 @@
 	chrome.app.runtime.onLaunched.addListener(function() {
 	    var pm = new PeerManager();
 	    pm.connect();
-	    setInterval(function(){
-	        console.log('syncProgress:', pm.syncProgress());
+	    var progressInterval = setInterval(function(){
+	        console.log('syncProgress:', pm.syncProgress(), 'height:',pm.syncedHeight());
 	    }, 2000);
 
 	    chrome.app.window.create(
@@ -69,6 +69,7 @@
 	      function(window) {
 	          window.onClosed.addListener(function() {
 	              pm.disconnect();
+	              clearInterval(progressInterval);
 	              console.log('Shut down.');
 	          });
 	      }
@@ -29447,28 +29448,30 @@
 
 	function PeerManager() {
 	    this.connected = false;
-	    //this.lastBlockHeight = 0;
 	    // last block height reported by current download peer
-	    this.peerCount = 0;
 	    this.pool = null;
 	    this.peers = [];
 	    this.downloadPeer = null;
-	    // TODO: Store the chain here for now!
-	    this.blockChain = [];
+	    this._bestHeight = 0;
+
+	    // TODO: Store this somewhere better
+	    this.knownBlockHashes = [];
 	}
 
 	PeerManager.prototype.connect = function() {
 	    var self = this;
 
 	    self.pool = new Pool();
-	    self.pool.on('peerready', self.peerConnected.bind(this));
-	    self.pool.on('peeraddrdisconnect', self.peerDisconnected.bind(this));
+	    self.pool.on('peerconnect', self.peerConnected.bind(this));
+	    self.pool.on('peerready', self.peerReady.bind(this));
+	    self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
 	    self.pool.on('peerheaders', self.peerHeaders.bind(this));
 	    
 	    // TODO:
 	    self.pool.on('peerinv', self.peerInv.bind(this));
 	    self.pool.on('peertx', self.peerTx.bind(this));
 	    self.pool.on('peerping', self.peerPing.bind(this));
+	    self.pool.on('peererror', self.peerError.bind(this));
 	    
 	    self.pool.connect();
 	    this.connected = true;
@@ -29476,20 +29479,50 @@
 
 	}
 
-	PeerManager.prototype.peerConnected = function(peer, addr) {
+	PeerManager.prototype.peerConnected = function(peer) {
 	    var self = this;
-	    console.log('connected: ', addr.ip.v4);
+	    console.log('peerConnected');
+	    self.peers.push(peer);
+
+	    // Only wait 2 seconds for verAck
+	    var peerTimeout = setTimeout(function() {
+	        console.log('peer timed out, disconnecting');
+	        peer.disconnect();
+	    },2000);
+
+	    // Clear timeout once peer is ready
+	    peer.on('ready', function() { clearTimeout(peerTimeout); });
+	}
+
+	PeerManager.prototype.peerReady = function(peer, addr) {
+	    var self = this;
+
+	    self._bestHeight = Math.max(self._bestHeight, peer.bestHeight);
+	    console.log('peerReady: ', addr.ip.v4);
 	    //TODO: Smarter peerDownload detection
 	    if(!self.downloadPeer) {
 	        self._setDownloadPeer(peer);
+	    } else {
+	        // Check if the new peer has a higher height, and switch
+	        // downloadPeer, if so
+	        if(peer.bestHeight > self.downloadPeer.bestHeight) {
+	            console.log('switching downloadPeer');
+	            self.downloadPeer.disconnect();
+	            self._setDownloadPeer(peer);
+	        }
+
 	    }
-	    self.peers.push(peer);
 	}
 
 	PeerManager.prototype.peerDisconnected = function(peer, addr) {
-	    console.log('removing', addr.hash);
+	    var self = this;
+	    console.log('removing:', addr.hash);
 	    for(var i in self.peers) {
 	        if(peer.host == self.peers[i].host){
+	            if(peer == self.downloadPeer){
+	                // TODO: is this good enough, or do we need to re-set it here?
+	                self.downloadPeer = null;
+	            }
 	            self.peers.splice(i-1,1);
 	            break;
 	        }
@@ -29497,7 +29530,39 @@
 	}
 
 	PeerManager.prototype.peerInv = function(peer, message) {
-	    console.log('peerinv', message);
+	    var self = this;
+	    var txHashes = [], blockHashes = [];
+	    for(var i in message.inventory) {
+	        switch(message.inventory[i].type) {
+	            case 1: // TX
+	                txHashes.push(message.inventory[i]);
+	                break;
+	            case 2: // Block
+	                blockHashes.push(message.inventory[i]);
+	                break;
+	            default: break;
+	        }
+	    }
+
+	    // TODO: Check for bloom filter
+
+	    // Stole this logic from breadWallet
+	    if(txHashes.length > 10000) {
+	        console.log('too many transactions, disconnecting from peer');
+	        peer.disconnect();
+	        return;
+	    }
+
+	    if(blockHashes.length == 1 &&
+	            self.getLatestBlockHash() == blockHashes[0].toString('hex')) {
+	        console.log('already had latest block, ignoring');
+	        blockHashes = [];
+	    }
+	    if(blockHashes.length == 1) {
+	        console.log('got new block!', blockHashes[0]);
+	        peer.sendMessage(
+	            new Messages.GetHeaders([self.getLatestBlockHash()]));
+	    }
 	}
 
 	PeerManager.prototype.peerTx = function(peer, message) {
@@ -29505,7 +29570,13 @@
 	}
 
 	PeerManager.prototype.peerPing = function(peer, message) {
-	    console.log('peerping', message);
+	    //console.log('peerping', message);
+	    // TODO: pong?
+	}
+
+	PeerManager.prototype.peerError = function(peer, e) {
+	    console.log('peererror', e);
+	    peer.disconnect();
 	}
 
 	PeerManager.prototype.peerHeaders = function(peer, message) {
@@ -29515,14 +29586,17 @@
 	        var blockHeader = new BlockHeader(message.headers[i]);
 	        if(blockHeader.validProofOfWork()) {
 	            var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
-	            var latestBlock = self.blockChain[self.blockChain.length-1];
-	            if(!self.blockChain.length && blockHeader.hash) {
-	                console.log('got first block');
-	                self.blockChain.push(blockHeader);
-	            } else if (latestBlock && prevHash == latestBlock.hash) {
-	                self.blockChain.push(blockHeader);
+	            if(!self.knownBlockHashes.length && blockHeader.hash) {
+	                // First block
+	                self.knownBlockHashes.push(blockHeader.hash);
+	            } else if (prevHash == self.getLatestBlockHash()) {
+	                self.knownBlockHashes.push(blockHeader.hash);
 	            } else {
 	                console.log('block didnt go on chain');
+	            }
+	            var syncedHeight = self.syncedHeight();
+	            if(syncedHeight > self.bestHeight) {
+	                self.bestHeight = syncedHeight;
 	            }
 	        }
 	    }
@@ -29541,9 +29615,8 @@
 
 	PeerManager.prototype.syncProgress = function() {
 	    var self = this;
-	    console.log('estimatedBlockHeight',self.estimatedBlockHeight(), self.syncedHeight());
 	    //TODO: this is really crude and crappy atm
-	    return self.blockChain.length /
+	    return self.knownBlockHashes.length /
 	        (self.estimatedBlockHeight() - STARTING_BLOCK_HEIGHT)
 	}
 
@@ -29552,12 +29625,31 @@
 	    if(!self.downloadPeer) {
 	        return 0;
 	    }
-	    return self.downloadPeer.bestHeight;
+	    return Math.max(self.downloadPeer.bestHeight, self.syncedHeight());
 	}
 
 	PeerManager.prototype.syncedHeight = function() {
 	    var self = this;
-	    return STARTING_BLOCK_HEIGHT + self.blockChain.length;
+	    return STARTING_BLOCK_HEIGHT + self.knownBlockHashes.length;
+	}
+
+	PeerManager.prototype.bestHeight = function() {
+	    var self = this;
+	    return Math.max(self.syncedHeight(), self._bestHeight)
+	}
+
+	PeerManager.prototype.getLatestBlockHash = function() {
+	    var self = this;
+	    return self.knownBlockHashes[self.knownBlockHashes.length -1]
+	}
+
+	PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
+	    var self = this;
+	    // TODO:
+	    //if (blockHeight > self.syncedBlockHeight()) {
+	        //// future block, assume 10 minutes per block after last block
+	        //return self.lastBlock.timestamp + (blockHeight - self.lastBlockHeight)*10*60;
+	    //}
 	}
 
 	PeerManager.prototype._setDownloadPeer = function(peer) {
@@ -29686,9 +29778,9 @@
 
 	Pool.MaxConnectedPeers = 8;
 	Pool.RetrySeconds = 30;
-	Pool.PeerEvents = ['version', 'inv', 'getdata', 'ping', 'ping', 'addr',
+	Pool.PeerEvents = ['version', 'inv', 'getdata', 'ping', 'pong', 'addr',
 	  'getaddr', 'verack', 'reject', 'alert', 'headers', 'block',
-	  'tx', 'getblocks', 'getheaders'
+	  'tx', 'getblocks', 'getheaders', 'error'
 	];
 
 
@@ -29770,6 +29862,9 @@
 	    var peer = new Peer(ip, port, self.network);
 	    peer.on('disconnect', function peerDisconnect() {
 	      self.emit('peerdisconnect', peer, addr);
+	    });
+	    peer.on('connect', function peerConnect() {
+	      self.emit('peerconnect', peer, addr);
 	    });
 	    peer.on('ready', function peerReady() {
 	      self.emit('peerready', peer, addr);
@@ -40347,17 +40442,17 @@
 			"sinon": "^1.12.2"
 		},
 		"license": "MIT",
-		"gitHead": "1a7e7e0a81ba8953f8e0790a48a5617731874d48",
 		"readme": "P2P Networking capabilities for bitcore\n=======\n\n[![NPM Package](https://img.shields.io/npm/v/bitcore-p2p.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-p2p)\n[![Build Status](https://img.shields.io/travis/bitpay/bitcore-p2p.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-p2p)\n[![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-p2p.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-p2p?branch=master)\n\nbitcore-p2p adds support for connecting to the bitcoin p2p network in [Node.js](http://nodejs.org/).\n\nSee [the main bitcore repo](https://github.com/bitpay/bitcore) for more information.\n\n## Getting Started\n\n```sh\nnpm install bitcore-p2p\n```\nIn order to connect to the bitcore network, you'll need to know the IP address of at least one node of the network. You can do that by using the known DNS servers. Then, you can connect to it:\n\n```javascript\nvar Peer = require('bitcore-p2p').Peer;\n\nvar peer = new Peer('0.0.0.0');\n\npeer.on('ready', function() {\n  // peer info\n  console.log(peer.version, peer.subversion, peer.bestHeight);\n});\npeer.on('disconnect', function() {\n  console.log('connection closed');\n});\npeer.connect();\n```\n\nThen, you can get information from other peers by using:\n\n```javascript\n// handle events\npeer.on('inv', function(message) {\n  // message.inventory[]\n});\npeer.on('tx', function(message) {\n  // message.transaction\n});\n```\n\nTake a look at the [bitcore guide](http://bitcore.io/guide/peer.html) on the usage of the `Peer` class.\n\n## Contributing\n\nSee [CONTRIBUTING.md](https://github.com/bitpay/bitcore) on the main bitcore repo for information about how to contribute.\n\n## License\n\nCode released under [the MIT license](https://github.com/bitpay/bitcore/blob/master/LICENSE).\n\nCopyright 2013-2015 BitPay, Inc. Bitcore is a trademark maintained by BitPay, Inc.\n\n",
 		"readmeFilename": "README.md",
+		"gitHead": "03185766a9d93ab1bdfa1702239b82bb9093ecb2",
 		"bugs": {
 			"url": "https://github.com/bitpay/bitcore-p2p/issues"
 		},
 		"homepage": "https://github.com/bitpay/bitcore-p2p",
 		"_id": "bitcore-p2p@0.10.0",
-		"_shasum": "fcc3cadeabb5b3ba1a0ac0035260b5185385f68c",
-		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-69248-2d0a48d7/git-cache-8f227d139168/1a7e7e0a81ba8953f8e0790a48a5617731874d48",
-		"_resolved": "git://github.com/throughnothing/bitcore-p2p.git#1a7e7e0a81ba8953f8e0790a48a5617731874d48"
+		"_shasum": "4eee62a3452c9481de08cdd14eac5207ad29bd8b",
+		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-52682-ec76915c/git-cache-0a9d72307ae6/03185766a9d93ab1bdfa1702239b82bb9093ecb2",
+		"_resolved": "git://github.com/throughnothing/bitcore-p2p.git#03185766a9d93ab1bdfa1702239b82bb9093ecb2"
 	}
 
 /***/ },
@@ -40513,45 +40608,16 @@
 			"gulp": "^3.8.10"
 		},
 		"license": "MIT",
-		"gitHead": "cdb1804184f760db0de15a94fbb20e1b79de352b",
+		"readme": "Bitcore\n=======\n\n[![NPM Package](https://img.shields.io/npm/v/bitcore.svg?style=flat-square)](https://www.npmjs.org/package/bitcore)\n[![Build Status](https://img.shields.io/travis/bitpay/bitcore.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore)\n[![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore)\n\n[![Sauce Test Status](https://saucelabs.com/browser-matrix/maraoz.svg)](https://saucelabs.com/u/maraoz)\n\nA pure and powerful JavaScript Bitcoin library.\n\n## Principles\n\nBitcoin is a powerful new peer-to-peer platform for the next generation of financial technology. The decentralized nature of the Bitcoin network allows for highly resilient bitcoin infrastructure, and the developer community needs reliable, open-source tools to implement bitcoin apps and services.\n\n## Get Started\n\n```\nnpm install bitcore\n```\n\nUsing it in Node.js:\n\n```javascript\nvar bitcore = require('bitcore');\n\nassert(bitcore.Address.isValid('126vMmY1fyznpZiFTTnty3cm1Rw8wuheev'));\nvar simpleTx = new bitcore.Transaction();\nvar simpleTx.from(unspent).to(address, amount);\nsimpleTx.sign(privateKey);\n```\n\n## Documentation\n\nThe complete docs are hosted here: [bitcore documentation](http://bitcore.io/guide/). There's also a [bitcore API reference](http://bitcore.io/api/) available generated from the JSDocs of the project, where you'll find low-level details on each bitcore utility.\n\n[Read the Developer Guide](http://bitcore.io/guide/)\n\n[Read the API Reference](http://bitcore.io/api/)\n\nTo get community assistance and ask for help with implementation questions, please use our [community forums](http://bitpaylabs.com/c/bitcore).\n\n## Modules\nThis module provides bitcoin's core features. Other features and protocol extensions are built into separate modules. Here is a list of official bitcore modules:\n\nModule | Version | Building | Coverage\n-------|---------|----------|---------\n[bitcore-payment-protocol](http://github.com/bitpay/bitcore-payment-protocol) | [![NPM Package](https://img.shields.io/npm/v/bitcore-payment-protocol.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-payment-protocol) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-payment-protocol.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-payment-protocol) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-payment-protocol.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-payment-protocol)\n[bitcore-p2p](http://github.com/bitpay/bitcore-p2p) | [![NPM Package](https://img.shields.io/npm/v/bitcore-p2p.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-p2p) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-p2p.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-p2p) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-p2p.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-p2p?branch=master)\n[bitcore-mnemonic](http://github.com/bitpay/bitcore-mnemonic) | [![NPM Package](https://img.shields.io/npm/v/bitcore-mnemonic.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-mnemonic) |  [![Build Status](https://img.shields.io/travis/bitpay/bitcore-mnemonic.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-mnemonic) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-mnemonic.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-mnemonic)\n[bitcore-ecies](http://github.com/bitpay/bitcore-ecies) | [![NPM Package](https://img.shields.io/npm/v/bitcore-ecies.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-ecies) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-ecies.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-ecies) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-ecies.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-ecies)\n[bitcore-channel](http://github.com/bitpay/bitcore-channel) | [![NPM Package](https://img.shields.io/npm/v/bitcore-channel.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-channel) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-channel.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-channel) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-channel.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-channel)\n[bitcore-explorers](http://github.com/bitpay/bitcore-explorers) | [![NPM Package](https://img.shields.io/npm/v/bitcore-explorers.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-explorers) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-explorers.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-explorers) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-explorers.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-explorers)\n[bitcore-message](http://github.com/bitpay/bitcore-message) | [![NPM Package](https://img.shields.io/npm/v/bitcore-message.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-message) | [![Build Status](https://img.shields.io/travis/bitpay/bitcore-message.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-message) | [![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-message.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-message)\n\n## Security\n\nWe're using Bitcore in production, as are [many others](http://bitcore.io#projects), but please use common sense when doing anything related to finances! We take no responsibility for your implementation decisions.\n\nIf you find a security issue, please email security@bitpay.com.\n\n## Contributing\n\nPlease send pull requests for bug fixes, code optimization, and ideas for improvement. For more information on how to contribute, please refer to our [CONTRIBUTING](https://github.com/bitpay/bitcore/blob/master/CONTRIBUTING.md) file. \n\n## Building the Browser Bundle\n\nTo build bitcore full bundle for the browser:\n\n```sh\ngulp browser\n```\n\nThis will generate files named `browser/bitcore.js` and `browser/bitcore.min.js`.\n\n## Tests\n\nRun all the tests:\n\n```sh\ngulp test\n```\n\nRun the NodeJS tests with mocha:\n\n```sh\ngulp test:node\n```\n\nRun the browser tests with karma:\n\n```sh\ngulp test:browser\n```\n\nCreate a test coverage report (you can open `coverage/lcov-report/index.html` to visualize it):\n\n```sh\ngulp coverage\n```\n\n## License\n\nCode released under [the MIT license](https://github.com/bitpay/bitcore/blob/master/LICENSE).\n\nCopyright 2013-2015 BitPay, Inc. Bitcore is a trademark maintained by BitPay, Inc.\n",
+		"readmeFilename": "README.md",
 		"bugs": {
 			"url": "https://github.com/bitpay/bitcore/issues"
 		},
 		"homepage": "https://github.com/bitpay/bitcore",
 		"_id": "bitcore@0.10.3",
 		"_shasum": "9e764b1eaebab8032c6fc0540e8e79f0a5b4c07b",
-		"_from": "bitcore@>=0.10.3 <0.11.0",
-		"_npmVersion": "2.3.0",
-		"_nodeVersion": "0.11.15",
-		"_npmUser": {
-			"name": "maraoz",
-			"email": "manuelaraoz@gmail.com"
-		},
-		"maintainers": [
-			{
-				"name": "gasteve",
-				"email": "stephen@pairhome.net"
-			},
-			{
-				"name": "maraoz",
-				"email": "manuelaraoz@gmail.com"
-			},
-			{
-				"name": "eordano",
-				"email": "eordano@gmail.com"
-			},
-			{
-				"name": "yemel",
-				"email": "angel.jardi@gmail.com"
-			}
-		],
-		"dist": {
-			"shasum": "9e764b1eaebab8032c6fc0540e8e79f0a5b4c07b",
-			"tarball": "http://registry.npmjs.org/bitcore/-/bitcore-0.10.3.tgz"
-		},
-		"directories": {},
 		"_resolved": "https://registry.npmjs.org/bitcore/-/bitcore-0.10.3.tgz",
-		"readme": "ERROR: No README data found!"
+		"_from": "bitcore@>=0.10.3 <0.11.0"
 	}
 
 /***/ },
