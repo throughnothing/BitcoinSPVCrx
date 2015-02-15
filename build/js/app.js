@@ -54,8 +54,8 @@
 	  console.log('sync complete!');
 	}
 
-	function onUpdatePeers(request) {
-	  console.log("numPeers:", request.numPeers);
+	function onUpdatePeers(request, action) {
+	  console.log(action, ' -- numPeers:', request.numPeers);
 	}
 
 	chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
@@ -72,10 +72,10 @@
 	      onSyncComplete(request);
 	      break;
 	    case 'peerconnect':
-	      onUpdatePeers(request);
+	      onUpdatePeers(request, 'connect');
 	      break;
 	    case 'peerdisconnect':
-	      onUpdatePeers(request);
+	      onUpdatePeers(request, 'disconnect');
 	      break;
 	    default:
 	      break;
