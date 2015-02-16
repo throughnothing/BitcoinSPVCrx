@@ -1,5 +1,5 @@
 'use strict';
-require ('bootstrap-webpack');
+require ('bootstrap-webpack!../bootstrap.config.js');
 var $ = require('jquery');
 
 function onSyncProgress(request) {

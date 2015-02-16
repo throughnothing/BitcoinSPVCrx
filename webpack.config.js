@@ -8,11 +8,11 @@ module.exports = {
     app: './js/app'
   },
   output: {
-    path: __dirname + '/build/js',
+    path: __dirname + '/build',
     filename: '[name].js'
   },
   resolve: {
-    extensions: ['', '.js', '.jsx', '.json','.css'],
+    extensions: ['', '.js', '.jsx', '.json'],
     alias: {
       net: 'chrome-net',
       dns: __dirname + '/js/chrome-statdns',
