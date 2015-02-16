@@ -11,7 +11,7 @@
   "license": "Public domain",
   "dependencies": {
     "bitcore": "^0.10.3",
-    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#9d8ab60483513d9d60717e1cd3e18cab2f76840e",
+    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#f29214787130fd113110351a87f5ad01cd0b1c4f",
     "bootstrap": "^3.3.2",
     "bootstrap-webpack": "0.0.3",
     "chrome-dgram": "^2.1.0",
