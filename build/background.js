@@ -45,7 +45,8 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
-	var PeerManager = __webpack_require__(82);
+	var PeerManager = __webpack_require__(162);
+	// TODO: include the wallet here as well
 
 	/**
 	 * Listens for the app launching, then creates the window.
@@ -54,27 +55,30 @@
 	 * @see http://developer.chrome.com/apps/app.window.html
 	 */
 	chrome.app.runtime.onLaunched.addListener(function() {
-	  var pm = new PeerManager();
-	  pm.on('syncprogress', function(progress) {
-	    chrome.runtime.sendMessage(
-	      {type: "syncprogress", progress: progress, height: pm.syncedHeight()});
-	  });
-	  pm.on('synccomplete', function() {
-	    chrome.runtime.sendMessage({type: "synccomplete", height: pm.syncedHeight()});
-	  });
-	  pm.on('peerconnect', function(numPeers) {
-	    chrome.runtime.sendMessage({type: "peerconnect", numPeers: numPeers});
-	  });
-	  pm.on('peerdisconnect', function(numPeers) {
-	    chrome.runtime.sendMessage({type: "peerdisconnect", numPeers: numPeers});
-	  });
+	  //var pm = new PeerManager();
+	  //pm.on('syncprogress', function(progress) {
+	    //chrome.runtime.sendMessage(
+	      //{type: "syncprogress", progress: progress, height: pm.syncedHeight()});
+	  //});
+	  //pm.on('synccomplete', function() {
+	    //chrome.runtime.sendMessage({type: "synccomplete", height: pm.syncedHeight()});
+	  //});
+	  //pm.on('peerconnect', function(numPeers) {
+	    //chrome.runtime.sendMessage({type: "peerconnect", numPeers: numPeers});
+	  //});
+	  //pm.on('peerdisconnect', function(numPeers) {
+	    //chrome.runtime.sendMessage({type: "peerdisconnect", numPeers: numPeers});
+	  //});
 	  //pm.connect();
+	  var pmWorker = new Worker('peermanager_worker.js');
 
 	  chrome.app.window.create(
 	    "index.html",
 	    {
 	      id: "bitcoin-spv-window",
-	      outerBounds: { minWidth: 400, minHeight: 600 }
+	      outerBounds: { minWidth: 400, minHeight: 600 },
+	      innerBounds: { maxWidth: 600, maxHeight: 800 },
+	      frame: { type: 'chrome' }
 	    },
 	    function(window) {
 	      window.onClosed.addListener(function() {
@@ -98,9 +102,9 @@
 	 * @license  MIT
 	 */
 
-	var base64 = __webpack_require__(146)
-	var ieee754 = __webpack_require__(147)
-	var isArray = __webpack_require__(148)
+	var base64 = __webpack_require__(182)
+	var ieee754 = __webpack_require__(183)
+	var isArray = __webpack_require__(184)
 
 	exports.Buffer = Buffer
 	exports.SlowBuffer = Buffer
@@ -1148,6 +1152,98 @@
 
 /***/ },
 /* 2 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// shim for using process in browser
+
+	var process = module.exports = {};
+
+	process.nextTick = (function () {
+	    var canSetImmediate = typeof window !== 'undefined'
+	    && window.setImmediate;
+	    var canMutationObserver = typeof window !== 'undefined'
+	    && window.MutationObserver;
+	    var canPost = typeof window !== 'undefined'
+	    && window.postMessage && window.addEventListener
+	    ;
+
+	    if (canSetImmediate) {
+	        return function (f) { return window.setImmediate(f) };
+	    }
+
+	    var queue = [];
+
+	    if (canMutationObserver) {
+	        var hiddenDiv = document.createElement("div");
+	        var observer = new MutationObserver(function () {
+	            var queueList = queue.slice();
+	            queue.length = 0;
+	            queueList.forEach(function (fn) {
+	                fn();
+	            });
+	        });
+
+	        observer.observe(hiddenDiv, { attributes: true });
+
+	        return function nextTick(fn) {
+	            if (!queue.length) {
+	                hiddenDiv.setAttribute('yes', 'no');
+	            }
+	            queue.push(fn);
+	        };
+	    }
+
+	    if (canPost) {
+	        window.addEventListener('message', function (ev) {
+	            var source = ev.source;
+	            if ((source === window || source === null) && ev.data === 'process-tick') {
+	                ev.stopPropagation();
+	                if (queue.length > 0) {
+	                    var fn = queue.shift();
+	                    fn();
+	                }
+	            }
+	        }, true);
+
+	        return function nextTick(fn) {
+	            queue.push(fn);
+	            window.postMessage('process-tick', '*');
+	        };
+	    }
+
+	    return function nextTick(fn) {
+	        setTimeout(fn, 0);
+	    };
+	})();
+
+	process.title = 'browser';
+	process.browser = true;
+	process.env = {};
+	process.argv = [];
+
+	function noop() {}
+
+	process.on = noop;
+	process.addListener = noop;
+	process.once = noop;
+	process.off = noop;
+	process.removeListener = noop;
+	process.removeAllListeners = noop;
+	process.emit = noop;
+
+	process.binding = function (name) {
+	    throw new Error('process.binding is not supported');
+	};
+
+	// TODO(shtylman)
+	process.cwd = function () { return '/' };
+	process.chdir = function (dir) {
+	    throw new Error('process.chdir is not supported');
+	};
+
+
+/***/ },
+/* 3 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_RESULT__;/* WEBPACK VAR INJECTION */(function(module, global) {/**
@@ -12152,19 +12248,20 @@
 	  }
 	}.call(this));
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(48)(module), (function() { return this; }())))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(68)(module), (function() { return this; }())))
 
 /***/ },
-/* 3 */
+/* 4 */,
+/* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 	var buffer = __webpack_require__(1);
-	var assert = __webpack_require__(8);
+	var assert = __webpack_require__(10);
 
-	var js = __webpack_require__(4);
-	var $ = __webpack_require__(5);
+	var js = __webpack_require__(6);
+	var $ = __webpack_require__(7);
 
 	function equals(a, b) {
 	  if (a.length !== b.length) {
@@ -12340,12 +12437,12 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 4 */
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
 	/**
 	 * Determines whether a string contains only hexadecimal values
@@ -12415,13 +12512,13 @@
 
 
 /***/ },
-/* 5 */
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var errors = __webpack_require__(16);
-	var _ = __webpack_require__(2);
+	var errors = __webpack_require__(20);
+	var _ = __webpack_require__(3);
 
 	module.exports = {
 	  checkState: function(condition, message) {
@@ -12438,7 +12535,7 @@
 	    argumentName = argumentName || '(unknown name)';
 	    if (_.isString(type)) {
 	      if (type === 'Buffer') {
-	        var BufferUtil = __webpack_require__(3);
+	        var BufferUtil = __webpack_require__(5);
 	        if (!BufferUtil.isBuffer(argument)) {
 	          throw new errors.InvalidArgumentType(argument, type, argumentName);
 	        }
@@ -12455,14 +12552,14 @@
 
 
 /***/ },
-/* 6 */
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var BN = __webpack_require__(11);
-	var $ = __webpack_require__(5);
-	var _ = __webpack_require__(2);
+	var BN = __webpack_require__(13);
+	var $ = __webpack_require__(7);
+	var _ = __webpack_require__(3);
 
 	var reversebuf = function(buf) {
 	  var buf2 = new Buffer(buf.length);
@@ -12659,16 +12756,16 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 7 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var hashjs = __webpack_require__(21);
-	var sha512 = __webpack_require__(117);
-	var crypto = __webpack_require__(49);
-	var BufferUtil = __webpack_require__(3);
-	var $ = __webpack_require__(5);
+	var hashjs = __webpack_require__(27);
+	var sha512 = __webpack_require__(153);
+	var crypto = __webpack_require__(69);
+	var BufferUtil = __webpack_require__(5);
+	var $ = __webpack_require__(7);
 
 	var Hash = module.exports;
 
@@ -12755,7 +12852,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 8 */
+/* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// http://wiki.commonjs.org/wiki/Unit_Testing/1.0
@@ -12785,7 +12882,7 @@
 	// when used in node, this will actually load the util module we depend on
 	// versus loading the builtin util module as happens otherwise
 	// this is a bug in node module loading as far as I am concerned
-	var util = __webpack_require__(17);
+	var util = __webpack_require__(21);
 
 	var pSlice = Array.prototype.slice;
 	var hasOwn = Object.prototype.hasOwnProperty;
@@ -13120,17 +13217,17 @@
 
 
 /***/ },
-/* 9 */,
-/* 10 */
+/* 11 */,
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(63);
+	module.exports = __webpack_require__(89);
 
-	module.exports.Interpreter = __webpack_require__(95);
+	module.exports.Interpreter = __webpack_require__(131);
 
 
 /***/ },
-/* 11 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Utils
@@ -15058,36 +15155,36 @@
 
 
 /***/ },
-/* 12 */
+/* 14 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var elliptic = exports;
 
-	elliptic.version = __webpack_require__(140).version;
-	elliptic.utils = __webpack_require__(108);
-	elliptic.rand = __webpack_require__(109);
-	elliptic.hmacDRBG = __webpack_require__(107);
-	elliptic.curve = __webpack_require__(37);
-	elliptic.curves = __webpack_require__(103);
+	elliptic.version = __webpack_require__(159).version;
+	elliptic.utils = __webpack_require__(144);
+	elliptic.rand = __webpack_require__(145);
+	elliptic.hmacDRBG = __webpack_require__(143);
+	elliptic.curve = __webpack_require__(47);
+	elliptic.curves = __webpack_require__(139);
 
 	// Protocols
-	elliptic.ec = __webpack_require__(104);
+	elliptic.ec = __webpack_require__(140);
 
 
 /***/ },
-/* 13 */
+/* 15 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var Address = __webpack_require__(18);
-	var BN = __webpack_require__(6);
-	var Point = __webpack_require__(26);
-	var Hash = __webpack_require__(7);
-	var JSUtil = __webpack_require__(4);
-	var Network = __webpack_require__(20);
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
+	var Address = __webpack_require__(24);
+	var BN = __webpack_require__(8);
+	var Point = __webpack_require__(31);
+	var Hash = __webpack_require__(9);
+	var JSUtil = __webpack_require__(6);
+	var Network = __webpack_require__(26);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
 
 	/**
 	 * Instantiate a PublicKey from a {@link PrivateKey}, {@link Point}, `string`, or `Buffer`.
@@ -15179,7 +15276,7 @@
 	 * @private
 	 */
 	PublicKey._isPrivateKey = function(param) {
-	  var PrivateKey = __webpack_require__(36);
+	  var PrivateKey = __webpack_require__(46);
 	  return param instanceof PrivateKey;
 	};
 
@@ -15508,15 +15605,17 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 14 */
+/* 16 */,
+/* 17 */,
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var BN = __webpack_require__(6);
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var BufferUtil = __webpack_require__(3);
+	var BN = __webpack_require__(8);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var BufferUtil = __webpack_require__(5);
 
 	var Signature = function Signature(r, s) {
 	  if (!(this instanceof Signature)) {
@@ -15812,13 +15911,13 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 15 */
+/* 19 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var bufferUtil = __webpack_require__(3);
-	var assert = __webpack_require__(8);
+	var bufferUtil = __webpack_require__(5);
+	var assert = __webpack_require__(10);
 
 	var BufferWriter = function BufferWriter(obj) {
 	  if (!(this instanceof BufferWriter))
@@ -15971,12 +16070,12 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 16 */
+/* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
 	function format(message, args) {
 	  return message
@@ -16027,7 +16126,7 @@
 	bitcore.Error.prototype.name = 'bitcore.Error';
 
 
-	var data = __webpack_require__(94);
+	var data = __webpack_require__(130);
 	traverseRoot(bitcore.Error, data);
 
 	module.exports = bitcore.Error;
@@ -16038,7 +16137,7 @@
 
 
 /***/ },
-/* 17 */
+/* 21 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(global, process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -16566,7 +16665,7 @@
 	}
 	exports.isPrimitive = isPrimitive;
 
-	exports.isBuffer = __webpack_require__(177);
+	exports.isBuffer = __webpack_require__(213);
 
 	function objectToString(o) {
 	  return Object.prototype.toString.call(o);
@@ -16610,7 +16709,7 @@
 	 *     prototype.
 	 * @param {function} superCtor Constructor function to inherit prototype from.
 	 */
-	exports.inherits = __webpack_require__(176);
+	exports.inherits = __webpack_require__(212);
 
 	exports._extend = function(origin, add) {
 	  // Don't do anything if add isn't an object
@@ -16628,20 +16727,22 @@
 	  return Object.prototype.hasOwnProperty.call(obj, prop);
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), __webpack_require__(24)))
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), __webpack_require__(2)))
 
 /***/ },
-/* 18 */
+/* 22 */,
+/* 23 */,
+/* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var base58check = __webpack_require__(29);
-	var Networks = __webpack_require__(20);
-	var Hash = __webpack_require__(7);
-	var JSUtil = __webpack_require__(4);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var base58check = __webpack_require__(36);
+	var Networks = __webpack_require__(26);
+	var Hash = __webpack_require__(9);
+	var JSUtil = __webpack_require__(6);
 
 	/**
 	 * Instantiate an address from an address String or Buffer, a public key or script hash Buffer,
@@ -16727,8 +16828,8 @@
 	 * @returns {Object} An "info" object with "type", "network", and "hashBuffer"
 	 */
 	Address.prototype._classifyArguments = function(data, network, type) {
-	  var PublicKey = __webpack_require__(13);
-	  var Script = __webpack_require__(10);
+	  var PublicKey = __webpack_require__(15);
+	  var Script = __webpack_require__(12);
 	  /* jshint maxcomplexity: 10 */
 	  // transform and validate input data
 	  if ((data instanceof Buffer || data instanceof Uint8Array) && data.length === 20) {
@@ -16862,7 +16963,7 @@
 	 * @private
 	 */
 	Address._transformPublicKey = function(pubkey){
-	  var PublicKey = __webpack_require__(13);
+	  var PublicKey = __webpack_require__(15);
 	  var info = {};
 	  if (!(pubkey instanceof PublicKey)) {
 	    throw new TypeError('Address must be an instance of PublicKey.');
@@ -16880,7 +16981,7 @@
 	 * @private
 	 */
 	Address._transformScript = function(script, network){
-	  var Script = __webpack_require__(10);
+	  var Script = __webpack_require__(12);
 	  var info = {};
 	  if (!(script instanceof Script)) {
 	    throw new TypeError('Address must be an instance of Script.');
@@ -16912,7 +17013,7 @@
 	 * @return {Address}
 	 */
 	Address.createMultisig = function(publicKeys, threshold, network) {
-	  var Script = __webpack_require__(10);
+	  var Script = __webpack_require__(12);
 	  network = network || publicKeys[0].network;
 	  return new Address(Script.buildMultisigOut(publicKeys, threshold), network || Networks.defaultNetwork);
 	};
@@ -17138,15 +17239,15 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 19 */
+/* 25 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var bufferUtil = __webpack_require__(3);
-	var BN = __webpack_require__(6);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var bufferUtil = __webpack_require__(5);
+	var BN = __webpack_require__(8);
 
 	var BufferReader = function BufferReader(buf) {
 	  if (!(this instanceof BufferReader)) {
@@ -17317,13 +17418,13 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 20 */
+/* 26 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
-	var BufferUtil = __webpack_require__(3);
+	var BufferUtil = __webpack_require__(5);
 	var networks = [];
 	var networkMaps = {};
 
@@ -17470,16 +17571,16 @@
 
 
 /***/ },
-/* 21 */
+/* 27 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var hash = exports;
 
-	hash.utils = __webpack_require__(114);
-	hash.common = __webpack_require__(110);
-	hash.sha = __webpack_require__(113);
-	hash.ripemd = __webpack_require__(112);
-	hash.hmac = __webpack_require__(111);
+	hash.utils = __webpack_require__(150);
+	hash.common = __webpack_require__(146);
+	hash.sha = __webpack_require__(149);
+	hash.ripemd = __webpack_require__(148);
+	hash.hmac = __webpack_require__(147);
 
 	// Proxy hash functions to the main object
 	hash.sha1 = hash.sha.sha1;
@@ -17489,7 +17590,7 @@
 
 
 /***/ },
-/* 22 */
+/* 28 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -17518,7 +17619,7 @@
 
 
 /***/ },
-/* 23 */
+/* 29 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -17825,99 +17926,7 @@
 
 
 /***/ },
-/* 24 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// shim for using process in browser
-
-	var process = module.exports = {};
-
-	process.nextTick = (function () {
-	    var canSetImmediate = typeof window !== 'undefined'
-	    && window.setImmediate;
-	    var canMutationObserver = typeof window !== 'undefined'
-	    && window.MutationObserver;
-	    var canPost = typeof window !== 'undefined'
-	    && window.postMessage && window.addEventListener
-	    ;
-
-	    if (canSetImmediate) {
-	        return function (f) { return window.setImmediate(f) };
-	    }
-
-	    var queue = [];
-
-	    if (canMutationObserver) {
-	        var hiddenDiv = document.createElement("div");
-	        var observer = new MutationObserver(function () {
-	            var queueList = queue.slice();
-	            queue.length = 0;
-	            queueList.forEach(function (fn) {
-	                fn();
-	            });
-	        });
-
-	        observer.observe(hiddenDiv, { attributes: true });
-
-	        return function nextTick(fn) {
-	            if (!queue.length) {
-	                hiddenDiv.setAttribute('yes', 'no');
-	            }
-	            queue.push(fn);
-	        };
-	    }
-
-	    if (canPost) {
-	        window.addEventListener('message', function (ev) {
-	            var source = ev.source;
-	            if ((source === window || source === null) && ev.data === 'process-tick') {
-	                ev.stopPropagation();
-	                if (queue.length > 0) {
-	                    var fn = queue.shift();
-	                    fn();
-	                }
-	            }
-	        }, true);
-
-	        return function nextTick(fn) {
-	            queue.push(fn);
-	            window.postMessage('process-tick', '*');
-	        };
-	    }
-
-	    return function nextTick(fn) {
-	        setTimeout(fn, 0);
-	    };
-	})();
-
-	process.title = 'browser';
-	process.browser = true;
-	process.env = {};
-	process.argv = [];
-
-	function noop() {}
-
-	process.on = noop;
-	process.addListener = noop;
-	process.once = noop;
-	process.off = noop;
-	process.removeListener = noop;
-	process.removeAllListeners = noop;
-	process.emit = noop;
-
-	process.binding = function (name) {
-	    throw new Error('process.binding is not supported');
-	};
-
-	// TODO(shtylman)
-	process.cwd = function () { return '/' };
-	process.chdir = function (dir) {
-	    throw new Error('process.chdir is not supported');
-	};
-
-
-/***/ },
-/* 25 */
+/* 30 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -17958,12 +17967,12 @@
 
 
 	/*<replacement>*/
-	var util = __webpack_require__(31);
-	util.inherits = __webpack_require__(32);
+	var util = __webpack_require__(39);
+	util.inherits = __webpack_require__(40);
 	/*</replacement>*/
 
-	var Readable = __webpack_require__(79);
-	var Writable = __webpack_require__(54);
+	var Readable = __webpack_require__(108);
+	var Writable = __webpack_require__(74);
 
 	util.inherits(Duplex, Readable);
 
@@ -18010,17 +18019,17 @@
 	  }
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ },
-/* 26 */
+/* 31 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var BN = __webpack_require__(6);
-	var bufferUtil = __webpack_require__(3);
-	var ec = __webpack_require__(12).curves.secp256k1;
+	var BN = __webpack_require__(8);
+	var bufferUtil = __webpack_require__(5);
+	var ec = __webpack_require__(14).curves.secp256k1;
 	var ecPoint = ec.curve.point.bind(ec.curve);
 	var ecPointFromX = ec.curve.pointFromX.bind(ec.curve);
 
@@ -18165,18 +18174,18 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 27 */
+/* 32 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var BN = __webpack_require__(6);
+	var _ = __webpack_require__(3);
+	var BN = __webpack_require__(8);
 	var buffer = __webpack_require__(1);
-	var bufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
-	var BufferWriter = __webpack_require__(15);
-	var Script = __webpack_require__(10);
+	var bufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
+	var BufferWriter = __webpack_require__(19);
+	var Script = __webpack_require__(12);
 
 	function Output(params) {
 	  if (!(this instanceof Output)) {
@@ -18299,7 +18308,9 @@
 
 
 /***/ },
-/* 28 */
+/* 33 */,
+/* 34 */,
+/* 35 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {var bitcore = module.exports;
@@ -18307,72 +18318,72 @@
 
 	// crypto 
 	bitcore.crypto = {};
-	bitcore.crypto.BN = __webpack_require__(6);
-	bitcore.crypto.ECDSA = __webpack_require__(60);
-	bitcore.crypto.Hash = __webpack_require__(7);
-	bitcore.crypto.Random = __webpack_require__(34);
-	bitcore.crypto.Point = __webpack_require__(26);
-	bitcore.crypto.Signature = __webpack_require__(14);
+	bitcore.crypto.BN = __webpack_require__(8);
+	bitcore.crypto.ECDSA = __webpack_require__(86);
+	bitcore.crypto.Hash = __webpack_require__(9);
+	bitcore.crypto.Random = __webpack_require__(44);
+	bitcore.crypto.Point = __webpack_require__(31);
+	bitcore.crypto.Signature = __webpack_require__(18);
 
 	// encoding
 	bitcore.encoding = {};
-	bitcore.encoding.Base58 = __webpack_require__(35);
-	bitcore.encoding.Base58Check = __webpack_require__(29);
-	bitcore.encoding.BufferReader = __webpack_require__(19);
-	bitcore.encoding.BufferWriter = __webpack_require__(15);
-	bitcore.encoding.Varint = __webpack_require__(93);
+	bitcore.encoding.Base58 = __webpack_require__(45);
+	bitcore.encoding.Base58Check = __webpack_require__(36);
+	bitcore.encoding.BufferReader = __webpack_require__(25);
+	bitcore.encoding.BufferWriter = __webpack_require__(19);
+	bitcore.encoding.Varint = __webpack_require__(129);
 
 	// utilities
 	bitcore.util = {};
-	bitcore.util.buffer = __webpack_require__(3);
-	bitcore.util.js = __webpack_require__(4);
-	bitcore.util.preconditions = __webpack_require__(5);
+	bitcore.util.buffer = __webpack_require__(5);
+	bitcore.util.js = __webpack_require__(6);
+	bitcore.util.preconditions = __webpack_require__(7);
 
 	// errors thrown by the library
-	bitcore.errors = __webpack_require__(16);
+	bitcore.errors = __webpack_require__(20);
 
 	// main bitcoin library
-	bitcore.Address = __webpack_require__(18);
-	bitcore.Block = __webpack_require__(58);
-	bitcore.BlockHeader = __webpack_require__(59);
-	bitcore.HDPrivateKey = __webpack_require__(61);
-	bitcore.HDPublicKey = __webpack_require__(62);
-	bitcore.Networks = __webpack_require__(20);
-	bitcore.Opcode = __webpack_require__(41);
-	bitcore.PrivateKey = __webpack_require__(36);
-	bitcore.PublicKey = __webpack_require__(13);
-	bitcore.Script = __webpack_require__(10);
-	bitcore.Transaction = __webpack_require__(42);
-	bitcore.URI = __webpack_require__(98);
-	bitcore.Unit = __webpack_require__(46);
+	bitcore.Address = __webpack_require__(24);
+	bitcore.Block = __webpack_require__(84);
+	bitcore.BlockHeader = __webpack_require__(85);
+	bitcore.HDPrivateKey = __webpack_require__(87);
+	bitcore.HDPublicKey = __webpack_require__(88);
+	bitcore.Networks = __webpack_require__(26);
+	bitcore.Opcode = __webpack_require__(58);
+	bitcore.PrivateKey = __webpack_require__(46);
+	bitcore.PublicKey = __webpack_require__(15);
+	bitcore.Script = __webpack_require__(12);
+	bitcore.Transaction = __webpack_require__(59);
+	bitcore.URI = __webpack_require__(134);
+	bitcore.Unit = __webpack_require__(63);
 
 	// dependencies, subject to change
 	bitcore.deps = {};
-	bitcore.deps.bnjs = __webpack_require__(11);
-	bitcore.deps.bs58 = __webpack_require__(66);
+	bitcore.deps.bnjs = __webpack_require__(13);
+	bitcore.deps.bs58 = __webpack_require__(92);
 	bitcore.deps.Buffer = Buffer;
-	bitcore.deps.elliptic = __webpack_require__(12);
-	bitcore.deps._ = __webpack_require__(2);
+	bitcore.deps.elliptic = __webpack_require__(14);
+	bitcore.deps._ = __webpack_require__(3);
 
 	// Internal usage, exposed for testing/advanced tweaking
-	bitcore._HDKeyCache = __webpack_require__(40);
-	bitcore.Transaction.sighash = __webpack_require__(30);
+	bitcore._HDKeyCache = __webpack_require__(57);
+	bitcore.Transaction.sighash = __webpack_require__(37);
 
 	// module information
-	bitcore.version = 'v'+__webpack_require__(141).version;
+	bitcore.version = 'v'+__webpack_require__(160).version;
 	
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 29 */
+/* 36 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var base58 = __webpack_require__(35);
+	var _ = __webpack_require__(3);
+	var base58 = __webpack_require__(45);
 	var buffer = __webpack_require__(1);
-	var sha256sha256 = __webpack_require__(7).sha256sha256;
+	var sha256sha256 = __webpack_require__(9).sha256sha256;
 
 	var Base58Check = function Base58Check(obj) {
 	  if (!(this instanceof Base58Check))
@@ -18466,23 +18477,23 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 30 */
+/* 37 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 	var buffer = __webpack_require__(1);
 
-	var Signature = __webpack_require__(14);
-	var Script = __webpack_require__(10);
-	var Output = __webpack_require__(27);
-	var BufferReader = __webpack_require__(19);
-	var BufferWriter = __webpack_require__(15);
-	var BN = __webpack_require__(6);
-	var Hash = __webpack_require__(7);
-	var ECDSA = __webpack_require__(60);
-	var $ = __webpack_require__(5);
-	var _ = __webpack_require__(2);
+	var Signature = __webpack_require__(18);
+	var Script = __webpack_require__(12);
+	var Output = __webpack_require__(32);
+	var BufferReader = __webpack_require__(25);
+	var BufferWriter = __webpack_require__(19);
+	var BN = __webpack_require__(8);
+	var Hash = __webpack_require__(9);
+	var ECDSA = __webpack_require__(86);
+	var $ = __webpack_require__(7);
+	var _ = __webpack_require__(3);
 
 	var SIGHASH_SINGLE_BUG = '0000000000000000000000000000000000000000000000000000000000000001';
 	var BITS_64_ON = 'ffffffffffffffff';
@@ -18498,8 +18509,8 @@
 	 * @param {Script} subscript the script that will be signed
 	 */
 	var sighash = function sighash(transaction, sighashType, inputNumber, subscript) {
-	  var Transaction = __webpack_require__(64);
-	  var Input = __webpack_require__(43);
+	  var Transaction = __webpack_require__(90);
+	  var Input = __webpack_require__(60);
 
 	  var i;
 	  // Copy transaction
@@ -18612,7 +18623,8 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 31 */
+/* 38 */,
+/* 39 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {// Copyright Joyent, Inc. and other Node contributors.
@@ -18725,7 +18737,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 32 */
+/* 40 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -18754,7 +18766,7 @@
 
 
 /***/ },
-/* 33 */
+/* 41 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -18780,15 +18792,15 @@
 
 	module.exports = Stream;
 
-	var EE = __webpack_require__(23).EventEmitter;
-	var inherits = __webpack_require__(174);
+	var EE = __webpack_require__(29).EventEmitter;
+	var inherits = __webpack_require__(210);
 
 	inherits(Stream, EE);
-	Stream.Readable = __webpack_require__(171);
-	Stream.Writable = __webpack_require__(173);
-	Stream.Duplex = __webpack_require__(168);
-	Stream.Transform = __webpack_require__(172);
-	Stream.PassThrough = __webpack_require__(170);
+	Stream.Readable = __webpack_require__(207);
+	Stream.Writable = __webpack_require__(209);
+	Stream.Duplex = __webpack_require__(204);
+	Stream.Transform = __webpack_require__(208);
+	Stream.PassThrough = __webpack_require__(206);
 
 	// Backwards-compat with node 0.4.x
 	Stream.Stream = Stream;
@@ -18887,7 +18899,9 @@
 
 
 /***/ },
-/* 34 */
+/* 42 */,
+/* 43 */,
+/* 44 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process, Buffer) {'use strict';
@@ -18904,7 +18918,7 @@
 	};
 
 	Random.getRandomBufferNode = function(size) {
-	  var crypto = __webpack_require__(49);
+	  var crypto = __webpack_require__(69);
 	  return crypto.randomBytes(size);
 	};
 
@@ -18948,16 +18962,16 @@
 
 	module.exports = Random;
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24), __webpack_require__(1).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(1).Buffer))
 
 /***/ },
-/* 35 */
+/* 45 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var bs58 = __webpack_require__(66);
+	var _ = __webpack_require__(3);
+	var bs58 = __webpack_require__(92);
 	var buffer = __webpack_require__(1);
 
 	var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'.split('');
@@ -19028,20 +19042,20 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 36 */
+/* 46 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var Address = __webpack_require__(18);
-	var base58check = __webpack_require__(29);
-	var BN = __webpack_require__(6);
-	var JSUtil = __webpack_require__(4);
-	var Networks = __webpack_require__(20);
-	var Point = __webpack_require__(26);
-	var PublicKey = __webpack_require__(13);
-	var Random = __webpack_require__(34);
+	var _ = __webpack_require__(3);
+	var Address = __webpack_require__(24);
+	var base58check = __webpack_require__(36);
+	var BN = __webpack_require__(8);
+	var JSUtil = __webpack_require__(6);
+	var Networks = __webpack_require__(26);
+	var Point = __webpack_require__(31);
+	var PublicKey = __webpack_require__(15);
+	var Random = __webpack_require__(44);
 
 	/**
 	 * Instantiate a PrivateKey from a BN, Buffer and WIF.
@@ -19439,19 +19453,24 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 37 */
+/* 47 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var curve = exports;
 
-	curve.base = __webpack_require__(99);
-	curve.short = __webpack_require__(102);
-	curve.mont = __webpack_require__(101);
-	curve.edwards = __webpack_require__(100);
+	curve.base = __webpack_require__(135);
+	curve.short = __webpack_require__(138);
+	curve.mont = __webpack_require__(137);
+	curve.edwards = __webpack_require__(136);
 
 
 /***/ },
-/* 38 */
+/* 48 */,
+/* 49 */,
+/* 50 */,
+/* 51 */,
+/* 52 */,
+/* 53 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -19480,7 +19499,7 @@
 
 
 /***/ },
-/* 39 */
+/* 54 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {module.exports = xor;
@@ -19496,7 +19515,9 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 40 */
+/* 55 */,
+/* 56 */,
+/* 57 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -19547,15 +19568,15 @@
 
 
 /***/ },
-/* 41 */
+/* 58 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var BufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var BufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
 
 	function Opcode(num) {
 	  if (!(this instanceof Opcode)) {
@@ -19790,42 +19811,42 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 42 */
+/* 59 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(64);
+	module.exports = __webpack_require__(90);
 
-	module.exports.Input = __webpack_require__(43);
-	module.exports.Output = __webpack_require__(27);
-	module.exports.UnspentOutput = __webpack_require__(65);
-	module.exports.Signature = __webpack_require__(45);
+	module.exports.Input = __webpack_require__(60);
+	module.exports.Output = __webpack_require__(32);
+	module.exports.UnspentOutput = __webpack_require__(91);
+	module.exports.Signature = __webpack_require__(62);
 
 
 /***/ },
-/* 43 */
+/* 60 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(44);
+	module.exports = __webpack_require__(61);
 
-	module.exports.PublicKeyHash = __webpack_require__(97);
-	module.exports.MultiSigScriptHash = __webpack_require__(96);
+	module.exports.PublicKeyHash = __webpack_require__(133);
+	module.exports.MultiSigScriptHash = __webpack_require__(132);
 
 
 /***/ },
-/* 44 */
+/* 61 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var errors = __webpack_require__(16);
-	var BufferWriter = __webpack_require__(15);
+	var _ = __webpack_require__(3);
+	var errors = __webpack_require__(20);
+	var BufferWriter = __webpack_require__(19);
 	var buffer = __webpack_require__(1);
-	var BufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
-	var Script = __webpack_require__(10);
-	var Sighash = __webpack_require__(30);
-	var Output = __webpack_require__(27);
+	var BufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
+	var Script = __webpack_require__(12);
+	var Sighash = __webpack_require__(37);
+	var Output = __webpack_require__(32);
 
 	function Input(params) {
 	  if (!(this instanceof Input)) {
@@ -19989,20 +20010,20 @@
 
 
 /***/ },
-/* 45 */
+/* 62 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var inherits = __webpack_require__(22);
-	var BufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var inherits = __webpack_require__(28);
+	var BufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
 
-	var PublicKey = __webpack_require__(13);
-	var errors = __webpack_require__(16);
-	var Signature = __webpack_require__(14);
+	var PublicKey = __webpack_require__(15);
+	var errors = __webpack_require__(20);
+	var Signature = __webpack_require__(18);
 
 	/**
 	 * @desc
@@ -20107,15 +20128,15 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 46 */
+/* 63 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
-	var errors = __webpack_require__(16);
-	var JSUtil = __webpack_require__(4);
+	var errors = __webpack_require__(20);
+	var JSUtil = __webpack_require__(6);
 
 	var UNITS = {
 	  'BTC'      : [1e8, 8],
@@ -20357,7 +20378,7 @@
 
 
 /***/ },
-/* 47 */
+/* 64 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer, process) {module.exports = WordArray
@@ -20476,10 +20497,13 @@
 
 
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer, __webpack_require__(24)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer, __webpack_require__(2)))
 
 /***/ },
-/* 48 */
+/* 65 */,
+/* 66 */,
+/* 67 */,
+/* 68 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function(module) {
@@ -20495,10 +20519,10 @@
 
 
 /***/ },
-/* 49 */
+/* 69 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var rng = __webpack_require__(163)
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var rng = __webpack_require__(199)
 
 	function error () {
 	  var m = [].slice.call(arguments).join(' ')
@@ -20509,9 +20533,9 @@
 	    ].join('\n'))
 	}
 
-	exports.createHash = __webpack_require__(70)
+	exports.createHash = __webpack_require__(99)
 
-	exports.createHmac = __webpack_require__(149)
+	exports.createHmac = __webpack_require__(185)
 
 	exports.randomBytes = function(size, callback) {
 	  if (callback && callback.call) {
@@ -20532,10 +20556,10 @@
 	  return ['sha1', 'sha256', 'sha512', 'md5', 'rmd160']
 	}
 
-	var p = __webpack_require__(162)(exports)
+	var p = __webpack_require__(198)(exports)
 	exports.pbkdf2 = p.pbkdf2
 	exports.pbkdf2Sync = p.pbkdf2Sync
-	__webpack_require__(154)(exports, module.exports);
+	__webpack_require__(190)(exports, module.exports);
 
 	// the least I can do is make error messages for the rest of the node.js/crypto api.
 	each(['createCredentials'
@@ -20551,7 +20575,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 50 */
+/* 70 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {var uint_max = Math.pow(2, 32);
@@ -20753,11 +20777,11 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 51 */
+/* 71 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var Transform = __webpack_require__(33).Transform;
-	var inherits = __webpack_require__(38);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var Transform = __webpack_require__(41).Transform;
+	var inherits = __webpack_require__(53);
 
 	module.exports = CipherBase;
 	inherits(CipherBase, Transform);
@@ -20791,7 +20815,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 52 */
+/* 72 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports['aes-128-ecb'] = {
@@ -20904,7 +20928,7 @@
 	};
 
 /***/ },
-/* 53 */
+/* 73 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -20973,11 +20997,11 @@
 
 	module.exports = Transform;
 
-	var Duplex = __webpack_require__(25);
+	var Duplex = __webpack_require__(30);
 
 	/*<replacement>*/
-	var util = __webpack_require__(31);
-	util.inherits = __webpack_require__(32);
+	var util = __webpack_require__(39);
+	util.inherits = __webpack_require__(40);
 	/*</replacement>*/
 
 	util.inherits(Transform, Duplex);
@@ -21119,7 +21143,7 @@
 
 
 /***/ },
-/* 54 */
+/* 74 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -21157,11 +21181,11 @@
 
 
 	/*<replacement>*/
-	var util = __webpack_require__(31);
-	util.inherits = __webpack_require__(32);
+	var util = __webpack_require__(39);
+	util.inherits = __webpack_require__(40);
 	/*</replacement>*/
 
-	var Stream = __webpack_require__(33);
+	var Stream = __webpack_require__(41);
 
 	util.inherits(Writable, Stream);
 
@@ -21172,7 +21196,7 @@
 	}
 
 	function WritableState(options, stream) {
-	  var Duplex = __webpack_require__(25);
+	  var Duplex = __webpack_require__(30);
 
 	  options = options || {};
 
@@ -21260,7 +21284,7 @@
 	}
 
 	function Writable(options) {
-	  var Duplex = __webpack_require__(25);
+	  var Duplex = __webpack_require__(30);
 
 	  // Writable ctor is applied to Duplexes, though they're not
 	  // instanceof Writable, they're instanceof Readable.
@@ -21600,10 +21624,16 @@
 	  state.ended = true;
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ },
-/* 55 */
+/* 75 */,
+/* 76 */,
+/* 77 */,
+/* 78 */,
+/* 79 */,
+/* 80 */,
+/* 81 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
@@ -21612,11 +21642,11 @@
 	 */
 	/* jshint curly: false */
 
-	var Buffers = __webpack_require__(57);
-	var Put = __webpack_require__(86);
-	var util = __webpack_require__(17);
+	var Buffers = __webpack_require__(83);
+	var Put = __webpack_require__(122);
+	var util = __webpack_require__(21);
 
-	var bitcore = __webpack_require__(28);
+	var bitcore = __webpack_require__(35);
 	var _ = bitcore.deps._;
 
 	var BlockHeaderModel = bitcore.BlockHeader;
@@ -21795,7 +21825,7 @@
 	 * @param{Buffer} nonce - a random 8 bytes buffer
 	 */
 	function Version(subversion, nonce) {
-	  var packageInfo = __webpack_require__(139);
+	  var packageInfo = __webpack_require__(158);
 	  this.command = 'version';
 	  this.version = PROTOCOL_VERSION;
 	  this.subversion = subversion || '/bitcore:' + packageInfo.version + '/';
@@ -22472,21 +22502,21 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 56 */
+/* 82 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var Buffers = __webpack_require__(57);
-	var EventEmitter = __webpack_require__(23).EventEmitter;
-	var Net = __webpack_require__(68);
-	var Socks5Client = __webpack_require__(87);
-	var util = __webpack_require__(17);
+	var Buffers = __webpack_require__(83);
+	var EventEmitter = __webpack_require__(29).EventEmitter;
+	var Net = __webpack_require__(94);
+	var Socks5Client = __webpack_require__(123);
+	var util = __webpack_require__(21);
 
-	var bitcore = __webpack_require__(28);
+	var bitcore = __webpack_require__(35);
 	var $ = bitcore.util.preconditions;
 	var Networks = bitcore.Networks;
-	var Messages = __webpack_require__(55);
+	var Messages = __webpack_require__(81);
 
 	var MAX_RECEIVE_BUFFER = 10000000;
 
@@ -22684,7 +22714,7 @@
 
 
 /***/ },
-/* 57 */
+/* 83 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {module.exports = Buffers;
@@ -22960,21 +22990,21 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 58 */
+/* 84 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var BlockHeader = __webpack_require__(59);
-	var BN = __webpack_require__(6);
-	var BufferUtil = __webpack_require__(3);
-	var BufferReader = __webpack_require__(19);
-	var BufferWriter = __webpack_require__(15);
-	var Hash = __webpack_require__(7);
-	var JSUtil = __webpack_require__(4);
-	var Transaction = __webpack_require__(42);
-	var $ = __webpack_require__(5);
+	var _ = __webpack_require__(3);
+	var BlockHeader = __webpack_require__(85);
+	var BN = __webpack_require__(8);
+	var BufferUtil = __webpack_require__(5);
+	var BufferReader = __webpack_require__(25);
+	var BufferWriter = __webpack_require__(19);
+	var Hash = __webpack_require__(9);
+	var JSUtil = __webpack_require__(6);
+	var Transaction = __webpack_require__(59);
+	var $ = __webpack_require__(7);
 
 	/**
 	 * Instantiate a Block from a Buffer, JSON object, or Object with
@@ -23267,18 +23297,18 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 59 */
+/* 85 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var BN = __webpack_require__(6);
-	var BufferUtil = __webpack_require__(3);
-	var BufferReader = __webpack_require__(19);
-	var BufferWriter = __webpack_require__(15);
-	var Hash = __webpack_require__(7);
-	var JSUtil = __webpack_require__(4);
+	var _ = __webpack_require__(3);
+	var BN = __webpack_require__(8);
+	var BufferUtil = __webpack_require__(5);
+	var BufferReader = __webpack_require__(25);
+	var BufferWriter = __webpack_require__(19);
+	var Hash = __webpack_require__(9);
+	var JSUtil = __webpack_require__(6);
 
 	/**
 	 * Instantiate a BlockHeader from a Buffer, JSON object, or Object with
@@ -23543,20 +23573,20 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 60 */
+/* 86 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var BN = __webpack_require__(6);
-	var Point = __webpack_require__(26);
-	var Signature = __webpack_require__(14);
-	var PublicKey = __webpack_require__(13);
-	var Random = __webpack_require__(34);
-	var Hash = __webpack_require__(7);
-	var BufferUtil = __webpack_require__(3);
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
+	var BN = __webpack_require__(8);
+	var Point = __webpack_require__(31);
+	var Signature = __webpack_require__(18);
+	var PublicKey = __webpack_require__(15);
+	var Random = __webpack_require__(44);
+	var Hash = __webpack_require__(9);
+	var BufferUtil = __webpack_require__(5);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
 
 	var ECDSA = function ECDSA(obj) {
 	  if (!(this instanceof ECDSA)) {
@@ -23845,30 +23875,30 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 61 */
+/* 87 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 
-	var assert = __webpack_require__(8);
+	var assert = __webpack_require__(10);
 	var buffer = __webpack_require__(1);
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
-	var BN = __webpack_require__(6);
-	var Base58 = __webpack_require__(35);
-	var Base58Check = __webpack_require__(29);
-	var Hash = __webpack_require__(7);
-	var Network = __webpack_require__(20);
-	var HDKeyCache = __webpack_require__(40);
-	var Point = __webpack_require__(26);
-	var PrivateKey = __webpack_require__(36);
-	var Random = __webpack_require__(34);
+	var BN = __webpack_require__(8);
+	var Base58 = __webpack_require__(45);
+	var Base58Check = __webpack_require__(36);
+	var Hash = __webpack_require__(9);
+	var Network = __webpack_require__(26);
+	var HDKeyCache = __webpack_require__(57);
+	var Point = __webpack_require__(31);
+	var PrivateKey = __webpack_require__(46);
+	var Random = __webpack_require__(44);
 
-	var errors = __webpack_require__(16);
+	var errors = __webpack_require__(20);
 	var hdErrors = errors.HDPrivateKey;
-	var BufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
+	var BufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
 
 	var MINIMUM_ENTROPY_BITS = 128;
 	var BITS_TO_BYTES = 1 / 8;
@@ -24260,7 +24290,7 @@
 	    fingerPrint: fingerPrint
 	  });
 
-	  var HDPublicKey = __webpack_require__(62);
+	  var HDPublicKey = __webpack_require__(88);
 	  var hdPublicKey = new HDPublicKey(this);
 
 	  JSUtil.defineImmutable(this, {
@@ -24411,29 +24441,29 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 62 */
+/* 88 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
-	var BN = __webpack_require__(6);
-	var Base58 = __webpack_require__(35);
-	var Base58Check = __webpack_require__(29);
-	var Hash = __webpack_require__(7);
-	var HDPrivateKey = __webpack_require__(61);
-	var HDKeyCache = __webpack_require__(40);
-	var Network = __webpack_require__(20);
-	var Point = __webpack_require__(26);
-	var PublicKey = __webpack_require__(13);
+	var _ = __webpack_require__(3);
+	var BN = __webpack_require__(8);
+	var Base58 = __webpack_require__(45);
+	var Base58Check = __webpack_require__(36);
+	var Hash = __webpack_require__(9);
+	var HDPrivateKey = __webpack_require__(87);
+	var HDKeyCache = __webpack_require__(57);
+	var Network = __webpack_require__(26);
+	var Point = __webpack_require__(31);
+	var PublicKey = __webpack_require__(15);
 
-	var bitcoreErrors = __webpack_require__(16);
+	var bitcoreErrors = __webpack_require__(20);
 	var errors = bitcoreErrors;
 	var hdErrors = bitcoreErrors.HDPublicKey;
-	var assert = __webpack_require__(8);
+	var assert = __webpack_require__(10);
 
-	var JSUtil = __webpack_require__(4);
-	var BufferUtil = __webpack_require__(3);
+	var JSUtil = __webpack_require__(6);
+	var BufferUtil = __webpack_require__(5);
 
 	/**
 	 * The representation of an hierarchically derived public key.
@@ -24887,27 +24917,27 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 63 */
+/* 89 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
 
-	var Address = __webpack_require__(18);
-	var BufferReader = __webpack_require__(19);
-	var BufferWriter = __webpack_require__(15);
-	var Hash = __webpack_require__(7);
-	var Opcode = __webpack_require__(41);
-	var PublicKey = __webpack_require__(13);
-	var Signature = __webpack_require__(14);
-	var Networks = __webpack_require__(20);
+	var Address = __webpack_require__(24);
+	var BufferReader = __webpack_require__(25);
+	var BufferWriter = __webpack_require__(19);
+	var Hash = __webpack_require__(9);
+	var Opcode = __webpack_require__(58);
+	var PublicKey = __webpack_require__(15);
+	var Signature = __webpack_require__(18);
+	var Networks = __webpack_require__(26);
 
-	var $ = __webpack_require__(5);
-	var _ = __webpack_require__(2);
-	var errors = __webpack_require__(16);
+	var $ = __webpack_require__(7);
+	var _ = __webpack_require__(3);
+	var errors = __webpack_require__(20);
 	var buffer = __webpack_require__(1);
-	var BufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
+	var BufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
 
 	/**
 	 * A bitcoin transaction script. Each transaction's inputs and outputs
@@ -25680,35 +25710,35 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 64 */
+/* 90 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
 	var buffer = __webpack_require__(1);
 
-	var errors = __webpack_require__(16);
-	var util = __webpack_require__(4);
-	var bufferUtil = __webpack_require__(3);
-	var JSUtil = __webpack_require__(4);
-	var BufferReader = __webpack_require__(19);
-	var BufferWriter = __webpack_require__(15);
-	var Hash = __webpack_require__(7);
-	var Signature = __webpack_require__(14);
-	var Sighash = __webpack_require__(30);
+	var errors = __webpack_require__(20);
+	var util = __webpack_require__(6);
+	var bufferUtil = __webpack_require__(5);
+	var JSUtil = __webpack_require__(6);
+	var BufferReader = __webpack_require__(25);
+	var BufferWriter = __webpack_require__(19);
+	var Hash = __webpack_require__(9);
+	var Signature = __webpack_require__(18);
+	var Sighash = __webpack_require__(37);
 
-	var Address = __webpack_require__(18);
-	var UnspentOutput = __webpack_require__(65);
-	var Input = __webpack_require__(43);
+	var Address = __webpack_require__(24);
+	var UnspentOutput = __webpack_require__(91);
+	var Input = __webpack_require__(60);
 	var PublicKeyHashInput = Input.PublicKeyHash;
 	var MultiSigScriptHashInput = Input.MultiSigScriptHash;
-	var Output = __webpack_require__(27);
-	var Script = __webpack_require__(10);
-	var PrivateKey = __webpack_require__(36);
-	var Block = __webpack_require__(58);
-	var BN = __webpack_require__(6);
+	var Output = __webpack_require__(32);
+	var Script = __webpack_require__(12);
+	var PrivateKey = __webpack_require__(46);
+	var Block = __webpack_require__(84);
+	var BN = __webpack_require__(8);
 
 	var CURRENT_VERSION = 1;
 	var DEFAULT_NLOCKTIME = 0;
@@ -26564,18 +26594,18 @@
 
 
 /***/ },
-/* 65 */
+/* 91 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var $ = __webpack_require__(5);
-	var JSUtil = __webpack_require__(4);
+	var _ = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var JSUtil = __webpack_require__(6);
 
-	var Script = __webpack_require__(10);
-	var Address = __webpack_require__(18);
-	var Unit = __webpack_require__(46);
+	var Script = __webpack_require__(12);
+	var Address = __webpack_require__(24);
+	var Unit = __webpack_require__(63);
 
 	/**
 	 * Represents an unspent output information: its script, associated amount and address,
@@ -26681,7 +26711,7 @@
 
 
 /***/ },
-/* 66 */
+/* 92 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Base58 encoding/decoding
@@ -26767,13 +26797,13 @@
 
 
 /***/ },
-/* 67 */
+/* 93 */
 /***/ function(module, exports, __webpack_require__) {
 
 	
-	var Hasher = __webpack_require__(115).Hasher 
+	var Hasher = __webpack_require__(151).Hasher 
 
-	var C_x64 = __webpack_require__(118)
+	var C_x64 = __webpack_require__(154)
 	var X64Word = C_x64.Word;
 	var X64WordArray = C_x64.WordArray;
 
@@ -27014,7 +27044,7 @@
 
 
 /***/ },
-/* 68 */
+/* 94 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process, Buffer) {/**
@@ -27026,11 +27056,11 @@
 	 * You can include this module with require('chrome-net')
 	 */
 
-	var EventEmitter = __webpack_require__(23).EventEmitter
-	var inherits = __webpack_require__(125)
-	var ipaddr = __webpack_require__(126)
-	var is = __webpack_require__(124)
-	var stream = __webpack_require__(33)
+	var EventEmitter = __webpack_require__(29).EventEmitter
+	var inherits = __webpack_require__(156)
+	var ipaddr = __webpack_require__(157)
+	var is = __webpack_require__(155)
+	var stream = __webpack_require__(41)
 
 	// Track open servers and sockets to route incoming sockets (via onAccept and onReceive)
 	// to the right handlers.
@@ -27894,17 +27924,20 @@
 	  return (x = Number(x)) >= 0 ? x : false
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24), __webpack_require__(1).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(1).Buffer))
 
 /***/ },
-/* 69 */,
-/* 70 */
+/* 95 */,
+/* 96 */,
+/* 97 */,
+/* 98 */,
+/* 99 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(158)
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(194)
 
-	var md5 = toConstructor(__webpack_require__(151))
-	var rmd160 = toConstructor(__webpack_require__(156))
+	var md5 = toConstructor(__webpack_require__(187))
+	var rmd160 = toConstructor(__webpack_require__(192))
 
 	function toConstructor (fn) {
 	  return function () {
@@ -27935,7 +27968,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 71 */
+/* 100 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {
@@ -27998,10 +28031,10 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 72 */
+/* 101 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var xor = __webpack_require__(39);
+	var xor = __webpack_require__(54);
 	exports.encrypt = function (self, block) {
 	  var data = xor(block, self._prev);
 	  self._prev = self._cipher.encryptBlock(data);
@@ -28015,10 +28048,10 @@
 	};
 
 /***/ },
-/* 73 */
+/* 102 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(39);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(54);
 	exports.encrypt = function (self, data, decrypt) {
 	  var out = new Buffer('');
 	  var len;
@@ -28048,10 +28081,10 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 74 */
+/* 103 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(39);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(54);
 	function getBlock(self) {
 	  var out = self._cipher.encryptBlock(self._prev);
 	  incr32(self._prev);
@@ -28082,7 +28115,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 75 */
+/* 104 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports.encrypt = function (self, block) {
@@ -28093,10 +28126,10 @@
 	};
 
 /***/ },
-/* 76 */
+/* 105 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(39);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(54);
 	function getBlock(self) {
 	  self._prev = self._cipher.encryptBlock(self._prev);
 	  return self._prev;
@@ -28112,12 +28145,12 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 77 */
+/* 106 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(50);
-	var Transform = __webpack_require__(51);
-	var inherits = __webpack_require__(38);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(70);
+	var Transform = __webpack_require__(71);
+	var inherits = __webpack_require__(53);
 
 	inherits(StreamCipher, Transform);
 	module.exports = StreamCipher;
@@ -28144,7 +28177,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 78 */
+/* 107 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -28174,11 +28207,11 @@
 
 	module.exports = PassThrough;
 
-	var Transform = __webpack_require__(53);
+	var Transform = __webpack_require__(73);
 
 	/*<replacement>*/
-	var util = __webpack_require__(31);
-	util.inherits = __webpack_require__(32);
+	var util = __webpack_require__(39);
+	util.inherits = __webpack_require__(40);
 	/*</replacement>*/
 
 	util.inherits(PassThrough, Transform);
@@ -28196,7 +28229,7 @@
 
 
 /***/ },
-/* 79 */
+/* 108 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -28223,7 +28256,7 @@
 	module.exports = Readable;
 
 	/*<replacement>*/
-	var isArray = __webpack_require__(169);
+	var isArray = __webpack_require__(205);
 	/*</replacement>*/
 
 
@@ -28233,7 +28266,7 @@
 
 	Readable.ReadableState = ReadableState;
 
-	var EE = __webpack_require__(23).EventEmitter;
+	var EE = __webpack_require__(29).EventEmitter;
 
 	/*<replacement>*/
 	if (!EE.listenerCount) EE.listenerCount = function(emitter, type) {
@@ -28241,18 +28274,18 @@
 	};
 	/*</replacement>*/
 
-	var Stream = __webpack_require__(33);
+	var Stream = __webpack_require__(41);
 
 	/*<replacement>*/
-	var util = __webpack_require__(31);
-	util.inherits = __webpack_require__(32);
+	var util = __webpack_require__(39);
+	util.inherits = __webpack_require__(40);
 	/*</replacement>*/
 
 	var StringDecoder;
 
 
 	/*<replacement>*/
-	var debug = __webpack_require__(179);
+	var debug = __webpack_require__(215);
 	if (debug && debug.debuglog) {
 	  debug = debug.debuglog('stream');
 	} else {
@@ -28264,7 +28297,7 @@
 	util.inherits(Readable, Stream);
 
 	function ReadableState(options, stream) {
-	  var Duplex = __webpack_require__(25);
+	  var Duplex = __webpack_require__(30);
 
 	  options = options || {};
 
@@ -28325,14 +28358,14 @@
 	  this.encoding = null;
 	  if (options.encoding) {
 	    if (!StringDecoder)
-	      StringDecoder = __webpack_require__(80).StringDecoder;
+	      StringDecoder = __webpack_require__(109).StringDecoder;
 	    this.decoder = new StringDecoder(options.encoding);
 	    this.encoding = options.encoding;
 	  }
 	}
 
 	function Readable(options) {
-	  var Duplex = __webpack_require__(25);
+	  var Duplex = __webpack_require__(30);
 
 	  if (!(this instanceof Readable))
 	    return new Readable(options);
@@ -28435,7 +28468,7 @@
 	// backwards compatibility.
 	Readable.prototype.setEncoding = function(enc) {
 	  if (!StringDecoder)
-	    StringDecoder = __webpack_require__(80).StringDecoder;
+	    StringDecoder = __webpack_require__(109).StringDecoder;
 	  this._readableState.decoder = new StringDecoder(enc);
 	  this._readableState.encoding = enc;
 	  return this;
@@ -29151,10 +29184,10 @@
 	  return -1;
 	}
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ },
-/* 80 */
+/* 109 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -29381,393 +29414,52 @@
 
 
 /***/ },
-/* 81 */
+/* 110 */,
+/* 111 */,
+/* 112 */,
+/* 113 */,
+/* 114 */,
+/* 115 */,
+/* 116 */,
+/* 117 */,
+/* 118 */,
+/* 119 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';
-	/* This is a 'dns' module 'replacement' since Chrome App API
-	 * has no dns abilities :(  I didn't want to make a full blown
-	 * dns client, so this is a temporary workaround using statdns.com's
-	 * HTTP interface to DNS, as this was simple to get up and running
-	 * with quickly.
-	 *
-	 * Currently this is just barebones what is needed by bitcoin-p2p/pool.js
-	 * May break this out into its own module eventually.
-	 *
-	 */
-
-	var base_url='http://api.statdns.com/';
-
-	// This is for running with node for testing
-	//if(!window) {
-	    //require.ensure([], function(require){
-	        //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
-	    //});
-	//}
-
-	exports.resolve = function(domain, rrtype, cb) {
-	    var res;
-	    if (!cb) {
-	        cb = rrtype;
-	        rrtype = undefined;
-	    }
-	    if(!rrtype) {
-	        rrtype = 'A'
-	    }
-
-	    var xhr = new XMLHttpRequest();
-	    xhr.open("GET", base_url + domain + '/' + rrtype, true);
-	    xhr.onload = function(e) {
-	        var ips = [];
-	        var response = JSON.parse(this.responseText);
-	        if(response.code) {
-	            return cb("Bad DNS lookup response")
-	        };
-	        for (var i in response.answer) {
-	            ips.push(response.answer[i].rdata);
-	        }
-	        cb(null, ips);
-	    }
-	    xhr.onerror = function(e) { cb("Error with dns lookup request") }
-	    xhr.send();
-	};
-
-
-/***/ },
-/* 82 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-	var bitcorep2p = __webpack_require__(83),
-	    Pool = bitcorep2p.Pool,
-	    Messages = bitcorep2p.Messages,
-	    bitcore = __webpack_require__(28),
-	    BlockHeader = bitcore.BlockHeader,
-	    bufferUtil = bitcore.util.buffer,
-	    EventEmitter = __webpack_require__(23).EventEmitter,
-	    util = __webpack_require__(17);
-
-
-	// Breadwallet uses 3, so that's good enough for us?!
-	Pool.MaxConnectedPeers = 3;
-	var MAX_GETDATA_HASHES = 50000;
-	// Random checkpoitns to use, most of these from Breadwallet BRPeerManager.m
-	var CHECKPOINTS = [
-	    [      0, "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", 1231006505, '0x1d00ffffu' ],
-	    [  20160, "000000000f1aef56190aee63d33a373e6487132d522ff4cd98ccfc96566d461e", 1248481816, '0x1d00ffffu' ],
-	    [  40320, "0000000045861e169b5a961b7034f8de9e98022e7a39100dde3ae3ea240d7245", 1266191579, '0x1c654657u' ],
-	    [  60480, "000000000632e22ce73ed38f46d5b408ff1cff2cc9e10daaf437dfd655153837", 1276298786, '0x1c0eba64u' ],
-	    [  80640, "0000000000307c80b87edf9f6a0697e2f01db67e518c8a4d6065d1d859a3a659", 1284861847, '0x1b4766edu' ],
-	    [ 100800, "000000000000e383d43cc471c64a9a4a46794026989ef4ff9611d5acb704e47a", 1294031411, '0x1b0404cbu' ],
-	    [ 120960, "0000000000002c920cf7e4406b969ae9c807b5c4f271f490ca3de1b0770836fc", 1304131980, '0x1b0098fau' ],
-	    [ 141120, "00000000000002d214e1af085eda0a780a8446698ab5c0128b6392e189886114", 1313451894, '0x1a094a86u' ],
-	    [ 161280, "00000000000005911fe26209de7ff510a8306475b75ceffd434b68dc31943b99", 1326047176, '0x1a0d69d7u' ],
-	    [ 181440, "00000000000000e527fc19df0992d58c12b98ef5a17544696bbba67812ef0e64", 1337883029, '0x1a0a8b5fu' ],
-	    [ 201600, "00000000000003a5e28bef30ad31f1f9be706e91ae9dda54179a95c9f9cd9ad0", 1349226660, '0x1a057e08u' ],
-	    [ 221760, "00000000000000fc85dd77ea5ed6020f9e333589392560b40908d3264bd1f401", 1361148470, '0x1a04985cu' ],
-	    [ 241920, "00000000000000b79f259ad14635739aaf0cc48875874b6aeecc7308267b50fa", 1371418654, '0x1a00de15u' ],
-	    [ 262080, "000000000000000aa77be1c33deac6b8d3b7b0757d02ce72fffddc768235d0e2", 1381070552, '0x1916b0cau' ],
-	    [ 282240, "0000000000000000ef9ee7529607286669763763e0c46acfdefd8a2306de5ca8", 1390570126, '0x1901f52cu' ],
-	    [ 302400, "0000000000000000472132c4daaf358acaf461ff1c3e96577a74e5ebf91bb170", 1400928750, '0x18692842u' ],
-	    [ 322560, "000000000000000002df2dd9d4fe0578392e519610e341dd09025469f101cfa1", 1411680080, '0x181FB893u' ],
-	    [ 342720, "00000000000000000f9cfece8494800d3dcbf9583232825da640c8703bcd27e7", 1423496415, '0x1818BB87u' ]
-	];
-
-	var TESTNET_CHECKPOINTS = [
-	    [      0, "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943", 1296688602, '1d00ffffu' ],
-	    [  20160, "000000001cf5440e7c9ae69f655759b17a32aad141896defd55bb895b7cfc44e", 1345001466, '1c4d1756u' ],
-	    [  40320, "000000008011f56b8c92ff27fb502df5723171c5374673670ef0eee3696aee6d", 1355980158, '1d00ffffu' ],
-	    [  60480, "00000000130f90cda6a43048a58788c0a5c75fa3c32d38f788458eb8f6952cee", 1363746033, '1c1eca8au' ],
-	    [  80640, "00000000002d0a8b51a9c028918db3068f976e3373d586f08201a4449619731c", 1369042673, '1c011c48u' ],
-	    [ 100800, "0000000000a33112f86f3f7b0aa590cb4949b84c2d9c673e9e303257b3be9000", 1376543922, '1c00d907u' ],
-	    [ 120960, "00000000003367e56e7f08fdd13b85bbb31c5bace2f8ca2b0000904d84960d0c", 1382025703, '1c00df4cu' ],
-	    [ 141120, "0000000007da2f551c3acd00e34cc389a4c6b6b3fad0e4e67907ad4c7ed6ab9f", 1384495076, '1c0ffff0u' ],
-	    [ 161280, "0000000001d1b79a1aec5702aaa39bad593980dfe26799697085206ef9513486", 1388980370, '1c03fffcu' ],
-	    [ 181440, "00000000002bb4563a0ec21dc4136b37dcd1b9d577a75a695c8dd0b861e1307e", 1392304311, '1b336ce6u' ],
-	    [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38", 1393813869, '1b602ac0u' ]
-	];
-
-	function PeerManager(network) {
-	    this.connected = false;
-	    this.network = bitcore.Networks[network] || bitcore.Networks.defaultNetwork;
-	    this.pool = null;
-	    this.peers = [];
-	    this.downloadPeer = null;
-	    this.knownBlockHashes = [];
-	    // TODO: Store this somewhere better
-	    this.blocks = [];
-
-	    this._bestHeight = 0;
-	}
-
-	util.inherits(PeerManager, EventEmitter);
-
-	PeerManager.prototype.connect = function() {
-	    var self = this;
-	    if(self.connected) return;
-
-	    self.pool = new Pool();
-	    self.pool.on('peerconnect', self.peerConnected.bind(this));
-	    self.pool.on('peerready', self.peerReady.bind(this));
-	    self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
-	    self.pool.on('peerheaders', self.peerHeaders.bind(this));
-	    self.pool.on('peerinv', self.peerInv.bind(this));
-	    self.pool.on('peertx', self.peerTx.bind(this));
-	    self.pool.on('peererror', self.peerError.bind(this));
-
-	    self.pool.connect();
-	    self.connected = true;
-	    
-	    // TODO: figure out why this is needed
-	    var readyTo = setTimeout(function(){
-	        console.log('pool reconnecting');
-	        self.disconnect();
-	        self.connect();
-	    },3000);
-	    self.pool.once('peerready', function() { clearTimeout(readyTo); });
-	}
-
-	PeerManager.prototype.peerConnected = function(peer) {
-	    var self = this;
-	    console.log('peerConnected');
-	    self.peers.push(peer);
-
-	    // Only wait 2 seconds for verAck
-	    var peerTimeout = setTimeout(function() {
-	        console.log('peer timed out, disconnecting');
-	        peer.disconnect();
-	    },2000);
-	    // Clear timeout once peer is ready
-	    peer.on('ready', function() { clearTimeout(peerTimeout); });
-	    self.emit('peerconnect', self.peers.length)
-	}
-
-	PeerManager.prototype.peerReady = function(peer, addr) {
-	    var self = this;
-
-	    self._bestHeight = Math.max(self._bestHeight, peer.bestHeight);
-	    console.log('peerReady: ', addr.ip.v4);
-	    //TODO: Smarter peerDownload detection
-	    if(!self.downloadPeer) {
-	        self._setDownloadPeer(peer);
-	    } else {
-	        // Check if the new peer has a higher height, and switch
-	        // downloadPeer, if so
-	        if(peer.bestHeight > self.downloadPeer.bestHeight) {
-	            console.log('switching downloadPeer');
-	            self.downloadPeer.disconnect();
-	            self._setDownloadPeer(peer);
-	        }
-	    }
-	}
-
-	PeerManager.prototype.peerDisconnected = function(peer, addr) {
-	    var self = this;
-	    console.log('removing:', addr.ip.v4);
-	    var idx = self.peers.indexOf(peer);
-	    if(idx && self.peers[idx] == self.downloadPeer){
-	        console.log('unsetting downloadPeer');
-	        // TODO: is this good enough, or do we need to re-set it here?
-	        self.downloadPeer = null;
-	    }
-	    self.peers.splice(idx-1,1);
-	    self.emit('peerdisconnect', self.peers.length)
-	}
-
-	PeerManager.prototype.peerInv = function(peer, message) {
-	    var self = this;
-	    var txHashes = [], blockHashes = [];
-
-	    if(message.count > MAX_GETDATA_HASHES) {
-	        console.log('inv message has too many items, dropping.');
-	        return;
-	    }
-
-	    for(var i in message.inventory) {
-	        switch(message.inventory[i].type) {
-	            case 1: // TX
-	                txHashes.push(message.inventory[i]);
-	                break;
-	            case 2: // Block
-	                blockHashes.push(message.inventory[i]);
-	                break;
-	            default: break;
-	        }
-	    }
-
-	    // TODO: Check for bloom filter
-
-	    // Stole this logic from breadWallet
-	    if(txHashes.length > 10000) {
-	        console.log('too many transactions, disconnecting from peer');
-	        peer.disconnect();
-	        return;
-	    }
-
-	    if(blockHashes.length == 1 &&
-	            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex')) > -1) {
-	        console.log('already had latest block, ignoring');
-	        blockHashes = [];
-	    }
-	    if(blockHashes.length == 1) {
-	        self.knownBlockHashes.push(blockHashes[0]);
-	        console.log('got new block!', blockHashes[0]);
-	        self.emit('syncstarted', self);
-	        peer.sendMessage(
-	            new Messages.GetHeaders([self.getLatestBlockHash()]));
-	    }
-	}
-
-	PeerManager.prototype.peerTx = function(peer, message) {
-	    console.log('peertx', message);
-	}
-
-	PeerManager.prototype.peerError = function(peer, e) {
-	    console.log('peererror', e);
-	    peer.disconnect();
-	}
-
-	PeerManager.prototype.peerHeaders = function(peer, message) {
-	    var self = this;
-	    //console.log('headers response');
-	    for(var i in message.headers) {
-	        var blockHeader = new BlockHeader(message.headers[i]);
-	        // TODO: This won't handle chain forks, it'll just accept the first
-	        // valid proof on top of the current chain.  It won't be able to find
-	        // another chain that grows longer than the first one seen.
-	        if(blockHeader.validProofOfWork()) {
-	            var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
-	            if(!self.blocks.length && blockHeader.hash) {
-	                // First block
-	                self.blocks.push(blockHeader.hash);
-	            } else if (prevHash == self.getLatestBlockHash()) {
-	                self.blocks.push(blockHeader.hash);
-	            } else {
-	                // TODO: do something better here?
-	                //console.log('block didnt go on chain');
-	            }
-	            var syncedHeight = self.syncedHeight();
-	            if(syncedHeight > self.bestHeight) {
-	                self.bestHeight = syncedHeight;
-	            }
-	        }
-	    }
-
-	    self.emit('syncprogress', self.syncProgress());
-	    // If we still have more messages to get
-	    if(self.syncedHeight() < self.estimatedBlockHeight()) {
-	        //console.log('getting more headers');
-	        var lastHeader = message.headers[message.headers.length - 1];
-	        peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
-	    } else {
-	        self.emit('synccomplete', self);
-	    }
-	}
-
-	PeerManager.prototype.disconnect = function() {
-	    this.connected=false;
-	    this.pool.disconnect();
-	}
-
-	PeerManager.prototype.syncProgress = function() {
-	    var self = this;
-	    //TODO: this is really crude and crappy atm
-	    return self.blocks.length /
-	        (self.estimatedBlockHeight() - self._getStartingCheckpoint()[0])
-	}
-
-	PeerManager.prototype.estimatedBlockHeight = function() {
-	    var self = this;
-	    if(!self.downloadPeer) {
-	        return 0;
-	    }
-	    return Math.max(self._bestHeight, self.syncedHeight());
-	}
-
-	PeerManager.prototype.syncedHeight = function() {
-	    var self = this;
-	    return self._getStartingCheckpoint()[0] + self.blocks.length;
-	}
-
-	PeerManager.prototype.bestHeight = function() {
-	    var self = this;
-	    return Math.max(self.syncedHeight(), self._bestHeight)
-	}
-
-	PeerManager.prototype.getLatestBlockHash = function() {
-	    var self = this;
-	    return self.blocks[self.blocks.length-1]
-	}
-
-	PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
-	    var self = this;
-	    // TODO:
-	    //if (blockHeight > self.syncedBlockHeight()) {
-	        //// future block, assume 10 minutes per block after last block
-	        //return self.lastBlock.timestamp + (blockHeight - self.lastBlockHeight)*10*60;
-	    //}
-	}
-
-	PeerManager.prototype._setDownloadPeer = function(peer) {
-	    var self = this;
-	    self.emit('syncstarted', self);
-	    self.downloadPeer = peer;
-	    // TODO: For now we always just start with startingBlock, fix that
-	    peer.sendMessage( new Messages.GetHeaders([self._getStartingCheckpoint()[1]]) );
-	}
-
-	PeerManager.prototype._getStartingCheckpoint = function() {
-	    var self = this;
-	    // TODO: base this on wallet start time (?)
-	    if(self.network && self.network.alias == 'mainnet') {
-	        return CHECKPOINTS[CHECKPOINTS.length - 1];
-	    } else {
-	        return TESTNET_CHECKPOINTS[TESTNET_CHECKPOINTS.length - 1];
-	    }
-	}
-
-
-	module.exports = PeerManager;
-
-
-/***/ },
-/* 83 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var bitcore = __webpack_require__(28);
-	bitcore.P2P = __webpack_require__(84);
+	var bitcore = __webpack_require__(35);
+	bitcore.P2P = __webpack_require__(120);
 
 	module.exports = bitcore.P2P;
 
 
 /***/ },
-/* 84 */
+/* 120 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
 	 * @namespace P2P
 	 */
 	module.exports = {
-	  Messages: __webpack_require__(55),
-	  Peer: __webpack_require__(56),
-	  Pool: __webpack_require__(85)
+	  Messages: __webpack_require__(81),
+	  Peer: __webpack_require__(82),
+	  Pool: __webpack_require__(121)
 	};
 
 
 /***/ },
-/* 85 */
+/* 121 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var dns = __webpack_require__(81);
-	var EventEmitter = __webpack_require__(23).EventEmitter;
+	var dns = __webpack_require__(161);
+	var EventEmitter = __webpack_require__(29).EventEmitter;
 
-	var bitcore = __webpack_require__(28);
+	var bitcore = __webpack_require__(35);
 	var Networks = bitcore.Networks;
 	var sha256 = bitcore.crypto.Hash.sha256;
-	var Peer = __webpack_require__(56);
-	var util = __webpack_require__(17);
+	var Peer = __webpack_require__(82);
+	var util = __webpack_require__(21);
 
 	function now() {
 	  return Math.floor(new Date().getTime() / 1000);
@@ -30043,7 +29735,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 86 */
+/* 122 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {function BufferPut () {
@@ -30152,7 +29844,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 87 */
+/* 123 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {/**
@@ -30175,12 +29867,12 @@
 
 	/*jshint node:true*/
 
-	var net = __webpack_require__(68);
-	var EventEmitter = __webpack_require__(23).EventEmitter;
-	var inherits = __webpack_require__(17).inherits;
+	var net = __webpack_require__(94);
+	var EventEmitter = __webpack_require__(29).EventEmitter;
+	var inherits = __webpack_require__(21).inherits;
 
-	var htons = __webpack_require__(92).htons;
-	var ipv6 = __webpack_require__(88).v6;
+	var htons = __webpack_require__(128).htons;
+	var ipv6 = __webpack_require__(124).v6;
 
 	module.exports = exports = Socks5ClientSocket;
 
@@ -30486,18 +30178,18 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 88 */
+/* 124 */
 /***/ function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(89);
+	exports = module.exports = __webpack_require__(125);
 
 /***/ },
-/* 89 */
+/* 125 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (true) {
-	  var sprintf = __webpack_require__(91).sprintf;
-	  var BigInteger = __webpack_require__(90).BigInteger;
+	  var sprintf = __webpack_require__(127).sprintf;
+	  var BigInteger = __webpack_require__(126).BigInteger;
 	}
 
 	var v4 = this.v4 = {};
@@ -31812,7 +31504,7 @@
 
 
 /***/ },
-/* 90 */
+/* 126 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -33072,7 +32764,7 @@
 	// end of stuff copied from github.
 
 /***/ },
-/* 91 */
+/* 127 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -33327,7 +33019,7 @@
 
 
 /***/ },
-/* 92 */
+/* 128 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* Copyright 2010 Membase, Inc.
@@ -33435,14 +33127,14 @@
 
 
 /***/ },
-/* 93 */
+/* 129 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var BufferWriter = __webpack_require__(15);
-	var BufferReader = __webpack_require__(19);
-	var BN = __webpack_require__(6);
+	var BufferWriter = __webpack_require__(19);
+	var BufferReader = __webpack_require__(25);
+	var BN = __webpack_require__(8);
 
 	var Varint = function Varint(buf) {
 	  if (!(this instanceof Varint))
@@ -33514,7 +33206,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 94 */
+/* 130 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -33663,19 +33355,19 @@
 
 
 /***/ },
-/* 95 */
+/* 131 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
-	var _ = __webpack_require__(2);
+	var _ = __webpack_require__(3);
 
-	var Script = __webpack_require__(63);
-	var Opcode = __webpack_require__(41);
-	var BN = __webpack_require__(6);
-	var Hash = __webpack_require__(7);
-	var Signature = __webpack_require__(14);
-	var PublicKey = __webpack_require__(13);
+	var Script = __webpack_require__(89);
+	var Opcode = __webpack_require__(58);
+	var BN = __webpack_require__(8);
+	var Hash = __webpack_require__(9);
+	var Signature = __webpack_require__(18);
+	var PublicKey = __webpack_require__(15);
 
 	/**
 	 * Bitcoin transactions contain scripts. Each input has a script called the
@@ -33713,7 +33405,7 @@
 	 * Translated from bitcoind's VerifyScript
 	 */
 	Interpreter.prototype.verify = function(scriptSig, scriptPubkey, tx, nin, flags) {
-	  var Transaction = __webpack_require__(42);
+	  var Transaction = __webpack_require__(59);
 	  if (_.isUndefined(tx)) {
 	    tx = new Transaction();
 	  }
@@ -34835,23 +34527,23 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 96 */
+/* 132 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var inherits = __webpack_require__(22);
-	var Input = __webpack_require__(44);
-	var Output = __webpack_require__(27);
-	var $ = __webpack_require__(5);
+	var _ = __webpack_require__(3);
+	var inherits = __webpack_require__(28);
+	var Input = __webpack_require__(61);
+	var Output = __webpack_require__(32);
+	var $ = __webpack_require__(7);
 
-	var Script = __webpack_require__(10);
-	var Signature = __webpack_require__(14);
-	var Sighash = __webpack_require__(30);
-	var PublicKey = __webpack_require__(13);
-	var BufferUtil = __webpack_require__(3);
-	var TransactionSignature = __webpack_require__(45);
+	var Script = __webpack_require__(12);
+	var Signature = __webpack_require__(18);
+	var Sighash = __webpack_require__(37);
+	var PublicKey = __webpack_require__(15);
+	var BufferUtil = __webpack_require__(5);
+	var TransactionSignature = __webpack_require__(62);
 
 	/**
 	 * @constructor
@@ -35007,23 +34699,23 @@
 
 
 /***/ },
-/* 97 */
+/* 133 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var inherits = __webpack_require__(22);
+	var inherits = __webpack_require__(28);
 
-	var $ = __webpack_require__(5);
-	var BufferUtil = __webpack_require__(3);
+	var $ = __webpack_require__(7);
+	var BufferUtil = __webpack_require__(5);
 
-	var Hash = __webpack_require__(7);
-	var Input = __webpack_require__(44);
-	var Output = __webpack_require__(27);
-	var Sighash = __webpack_require__(30);
-	var Script = __webpack_require__(10);
-	var Signature = __webpack_require__(14);
-	var TransactionSignature = __webpack_require__(45);
+	var Hash = __webpack_require__(9);
+	var Input = __webpack_require__(61);
+	var Output = __webpack_require__(32);
+	var Sighash = __webpack_require__(37);
+	var Script = __webpack_require__(12);
+	var Signature = __webpack_require__(18);
+	var TransactionSignature = __webpack_require__(62);
 
 	/**
 	 * Represents a special kind of input of PayToPublicKeyHash kind.
@@ -35108,17 +34800,17 @@
 
 
 /***/ },
-/* 98 */
+/* 134 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _ = __webpack_require__(2);
-	var URL = __webpack_require__(175);
+	var _ = __webpack_require__(3);
+	var URL = __webpack_require__(211);
 
-	var Address = __webpack_require__(18);
-	var Unit = __webpack_require__(46);
-	var JSUtil = __webpack_require__(4);
+	var Address = __webpack_require__(24);
+	var Unit = __webpack_require__(63);
+	var JSUtil = __webpack_require__(6);
 
 	/**
 	 * Bitcore URI
@@ -35345,12 +35037,12 @@
 
 
 /***/ },
-/* 99 */
+/* 135 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var bn = __webpack_require__(11);
-	var elliptic = __webpack_require__(12);
+	var assert = __webpack_require__(10);
+	var bn = __webpack_require__(13);
+	var elliptic = __webpack_require__(14);
 
 	var getNAF = elliptic.utils.getNAF;
 	var getJSF = elliptic.utils.getJSF;
@@ -35653,14 +35345,14 @@
 
 
 /***/ },
-/* 100 */
+/* 136 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var curve = __webpack_require__(37);
-	var elliptic = __webpack_require__(12);
-	var bn = __webpack_require__(11);
-	var inherits = __webpack_require__(22);
+	var assert = __webpack_require__(10);
+	var curve = __webpack_require__(47);
+	var elliptic = __webpack_require__(14);
+	var bn = __webpack_require__(13);
+	var inherits = __webpack_require__(28);
 	var Base = curve.base;
 
 	var getNAF = elliptic.utils.getNAF;
@@ -36020,14 +35712,14 @@
 
 
 /***/ },
-/* 101 */
+/* 137 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var curve = __webpack_require__(37);
-	var elliptic = __webpack_require__(12);
-	var bn = __webpack_require__(11);
-	var inherits = __webpack_require__(22);
+	var assert = __webpack_require__(10);
+	var curve = __webpack_require__(47);
+	var elliptic = __webpack_require__(14);
+	var bn = __webpack_require__(13);
+	var inherits = __webpack_require__(28);
 	var Base = curve.base;
 
 	var getNAF = elliptic.utils.getNAF;
@@ -36189,14 +35881,14 @@
 
 
 /***/ },
-/* 102 */
+/* 138 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var curve = __webpack_require__(37);
-	var elliptic = __webpack_require__(12);
-	var bn = __webpack_require__(11);
-	var inherits = __webpack_require__(22);
+	var assert = __webpack_require__(10);
+	var curve = __webpack_require__(47);
+	var elliptic = __webpack_require__(14);
+	var bn = __webpack_require__(13);
+	var inherits = __webpack_require__(28);
 	var Base = curve.base;
 
 	var getNAF = elliptic.utils.getNAF;
@@ -37091,15 +36783,15 @@
 
 
 /***/ },
-/* 103 */
+/* 139 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var curves = exports;
 
-	var assert = __webpack_require__(8);
-	var hash = __webpack_require__(21);
-	var bn = __webpack_require__(11);
-	var elliptic = __webpack_require__(12);
+	var assert = __webpack_require__(10);
+	var hash = __webpack_require__(27);
+	var bn = __webpack_require__(13);
+	var elliptic = __webpack_require__(14);
 
 	function PresetCurve(options) {
 	  if (options.type === 'short')
@@ -38024,16 +37716,16 @@
 
 
 /***/ },
-/* 104 */
+/* 140 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var bn = __webpack_require__(11);
-	var elliptic = __webpack_require__(12);
+	var assert = __webpack_require__(10);
+	var bn = __webpack_require__(13);
+	var elliptic = __webpack_require__(14);
 	var utils = elliptic.utils;
 
-	var KeyPair = __webpack_require__(105);
-	var Signature = __webpack_require__(106);
+	var KeyPair = __webpack_require__(141);
+	var Signature = __webpack_require__(142);
 
 	function EC(options) {
 	  if (!(this instanceof EC))
@@ -38181,13 +37873,13 @@
 
 
 /***/ },
-/* 105 */
+/* 141 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var bn = __webpack_require__(11);
+	var assert = __webpack_require__(10);
+	var bn = __webpack_require__(13);
 
-	var elliptic = __webpack_require__(12);
+	var elliptic = __webpack_require__(14);
 	var utils = elliptic.utils;
 
 	function KeyPair(ec, priv, pub) {
@@ -38331,13 +38023,13 @@
 
 
 /***/ },
-/* 106 */
+/* 142 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var bn = __webpack_require__(11);
+	var assert = __webpack_require__(10);
+	var bn = __webpack_require__(13);
 
-	var elliptic = __webpack_require__(12);
+	var elliptic = __webpack_require__(14);
 	var utils = elliptic.utils;
 
 	function Signature(r, s) {
@@ -38400,13 +38092,13 @@
 
 
 /***/ },
-/* 107 */
+/* 143 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
+	var assert = __webpack_require__(10);
 
-	var hash = __webpack_require__(21);
-	var elliptic = __webpack_require__(12);
+	var hash = __webpack_require__(27);
+	var elliptic = __webpack_require__(14);
 	var utils = elliptic.utils;
 
 	function HmacDRBG(options) {
@@ -38519,11 +38211,11 @@
 
 
 /***/ },
-/* 108 */
+/* 144 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assert = __webpack_require__(8);
-	var bn = __webpack_require__(11);
+	var assert = __webpack_require__(10);
+	var bn = __webpack_require__(13);
 
 	var utils = exports;
 
@@ -38671,7 +38363,7 @@
 
 
 /***/ },
-/* 109 */
+/* 145 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var r;
@@ -38716,17 +38408,17 @@
 	  var crypto;
 	  Rand.prototype._rand = function _rand(n) {
 	    if (!crypto)
-	      crypto = __webpack_require__(49);
+	      crypto = __webpack_require__(69);
 	    return crypto.randomBytes(n);
 	  };
 	}
 
 
 /***/ },
-/* 110 */
+/* 146 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var hash = __webpack_require__(21);
+	var hash = __webpack_require__(27);
 	var utils = hash.utils;
 	var assert = utils.assert;
 
@@ -38813,12 +38505,12 @@
 
 
 /***/ },
-/* 111 */
+/* 147 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var hmac = exports;
 
-	var hash = __webpack_require__(21);
+	var hash = __webpack_require__(27);
 	var utils = hash.utils;
 	var assert = utils.assert;
 
@@ -38867,10 +38559,10 @@
 
 
 /***/ },
-/* 112 */
+/* 148 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var hash = __webpack_require__(21);
+	var hash = __webpack_require__(27);
 	var utils = hash.utils;
 
 	var rotl32 = utils.rotl32;
@@ -39016,10 +38708,10 @@
 
 
 /***/ },
-/* 113 */
+/* 149 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var hash = __webpack_require__(21);
+	var hash = __webpack_require__(27);
 	var utils = hash.utils;
 	var assert = utils.assert;
 
@@ -39237,11 +38929,11 @@
 
 
 /***/ },
-/* 114 */
+/* 150 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var utils = exports;
-	var inherits = __webpack_require__(22);
+	var inherits = __webpack_require__(28);
 
 	function toArray(msg, enc) {
 	  if (Array.isArray(msg))
@@ -39419,10 +39111,10 @@
 
 
 /***/ },
-/* 115 */
+/* 151 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var WordArray = __webpack_require__(47)
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var WordArray = __webpack_require__(64)
 
 	var Base = (function () {
 	  function F() {}
@@ -39734,11 +39426,11 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 116 */
+/* 152 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var sha512 = __webpack_require__(67).sha512
-	var WordArray = __webpack_require__(47)
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var sha512 = __webpack_require__(93).sha512
+	var WordArray = __webpack_require__(64)
 
 	function HMAC(key) {
 	  if (!(this instanceof HMAC))
@@ -39833,17 +39525,17 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 117 */
+/* 153 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(67)
-	module.exports.hmac = __webpack_require__(116)
+	module.exports = __webpack_require__(93)
+	module.exports.hmac = __webpack_require__(152)
 
 /***/ },
-/* 118 */
+/* 154 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var X32WordArray = __webpack_require__(47)
+	var X32WordArray = __webpack_require__(64)
 
 
 	function X64Word(high, low) {
@@ -39882,12 +39574,7 @@
 
 
 /***/ },
-/* 119 */,
-/* 120 */,
-/* 121 */,
-/* 122 */,
-/* 123 */,
-/* 124 */
+/* 155 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {// Copyright Joyent, Inc. and other Node contributors.
@@ -40000,7 +39687,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 125 */
+/* 156 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -40029,7 +39716,7 @@
 
 
 /***/ },
-/* 126 */
+/* 157 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {(function() {
@@ -40438,22 +40125,10 @@
 
 	}).call(this);
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(48)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(68)(module)))
 
 /***/ },
-/* 127 */,
-/* 128 */,
-/* 129 */,
-/* 130 */,
-/* 131 */,
-/* 132 */,
-/* 133 */,
-/* 134 */,
-/* 135 */,
-/* 136 */,
-/* 137 */,
-/* 138 */,
-/* 139 */
+/* 158 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = {
@@ -40526,21 +40201,21 @@
 			"sinon": "^1.12.2"
 		},
 		"license": "MIT",
+		"gitHead": "9d8ab60483513d9d60717e1cd3e18cab2f76840e",
 		"readme": "P2P Networking capabilities for bitcore\n=======\n\n[![NPM Package](https://img.shields.io/npm/v/bitcore-p2p.svg?style=flat-square)](https://www.npmjs.org/package/bitcore-p2p)\n[![Build Status](https://img.shields.io/travis/bitpay/bitcore-p2p.svg?branch=master&style=flat-square)](https://travis-ci.org/bitpay/bitcore-p2p)\n[![Coverage Status](https://img.shields.io/coveralls/bitpay/bitcore-p2p.svg?style=flat-square)](https://coveralls.io/r/bitpay/bitcore-p2p?branch=master)\n\nbitcore-p2p adds support for connecting to the bitcoin p2p network in [Node.js](http://nodejs.org/).\n\nSee [the main bitcore repo](https://github.com/bitpay/bitcore) for more information.\n\n## Getting Started\n\n```sh\nnpm install bitcore-p2p\n```\nIn order to connect to the bitcore network, you'll need to know the IP address of at least one node of the network. You can do that by using the known DNS servers. Then, you can connect to it:\n\n```javascript\nvar Peer = require('bitcore-p2p').Peer;\n\nvar peer = new Peer('0.0.0.0');\n\npeer.on('ready', function() {\n  // peer info\n  console.log(peer.version, peer.subversion, peer.bestHeight);\n});\npeer.on('disconnect', function() {\n  console.log('connection closed');\n});\npeer.connect();\n```\n\nThen, you can get information from other peers by using:\n\n```javascript\n// handle events\npeer.on('inv', function(message) {\n  // message.inventory[]\n});\npeer.on('tx', function(message) {\n  // message.transaction\n});\n```\n\nTake a look at the [bitcore guide](http://bitcore.io/guide/peer.html) on the usage of the `Peer` class.\n\n## Contributing\n\nSee [CONTRIBUTING.md](https://github.com/bitpay/bitcore) on the main bitcore repo for information about how to contribute.\n\n## License\n\nCode released under [the MIT license](https://github.com/bitpay/bitcore/blob/master/LICENSE).\n\nCopyright 2013-2015 BitPay, Inc. Bitcore is a trademark maintained by BitPay, Inc.\n\n",
 		"readmeFilename": "README.md",
-		"gitHead": "9d8ab60483513d9d60717e1cd3e18cab2f76840e",
 		"bugs": {
 			"url": "https://github.com/bitpay/bitcore-p2p/issues"
 		},
 		"homepage": "https://github.com/bitpay/bitcore-p2p",
 		"_id": "bitcore-p2p@0.10.0",
-		"_shasum": "343e740aeff4cb721a828094419c1e8a7dbfa83c",
-		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-58131-acf72974/git-cache-ad102613ce79/9d8ab60483513d9d60717e1cd3e18cab2f76840e",
+		"_shasum": "b3553fc78d651b3c1279e33dc1db3b99d373ad5f",
+		"_from": "../../../../../var/folders/ht/zgv6kqxn6w7gklpbs8qp7bpr0000gn/T/npm-19946-9f97d594/git-cache-5c386ff88211/9d8ab60483513d9d60717e1cd3e18cab2f76840e",
 		"_resolved": "git://github.com/throughnothing/bitcore-p2p.git#9d8ab60483513d9d60717e1cd3e18cab2f76840e"
 	}
 
 /***/ },
-/* 140 */
+/* 159 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = {
@@ -40590,7 +40265,7 @@
 	}
 
 /***/ },
-/* 141 */
+/* 160 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = {
@@ -40705,11 +40380,377 @@
 	}
 
 /***/ },
-/* 142 */,
-/* 143 */,
-/* 144 */,
-/* 145 */,
-/* 146 */
+/* 161 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	/* This is a 'dns' module 'replacement' since Chrome App API
+	 * has no dns abilities :(  I didn't want to make a full blown
+	 * dns client, so this is a temporary workaround using statdns.com's
+	 * HTTP interface to DNS, as this was simple to get up and running
+	 * with quickly.
+	 *
+	 * Currently this is just barebones what is needed by bitcoin-p2p/pool.js
+	 * May break this out into its own module eventually.
+	 *
+	 */
+
+	var base_url='http://api.statdns.com/';
+
+	// This is for running with node for testing
+	//if(!window) {
+	    //require.ensure([], function(require){
+	        //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+	    //});
+	//}
+
+	exports.resolve = function(domain, rrtype, cb) {
+	    var res;
+	    if (!cb) {
+	        cb = rrtype;
+	        rrtype = undefined;
+	    }
+	    if(!rrtype) {
+	        rrtype = 'A'
+	    }
+
+	    var xhr = new XMLHttpRequest();
+	    xhr.open("GET", base_url + domain + '/' + rrtype, true);
+	    xhr.onload = function(e) {
+	        var ips = [];
+	        var response = JSON.parse(this.responseText);
+	        if(response.code) {
+	            return cb("Bad DNS lookup response")
+	        };
+	        for (var i in response.answer) {
+	            ips.push(response.answer[i].rdata);
+	        }
+	        cb(null, ips);
+	    }
+	    xhr.onerror = function(e) { cb("Error with dns lookup request") }
+	    xhr.send();
+	};
+
+
+/***/ },
+/* 162 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	var bitcorep2p = __webpack_require__(119),
+	    Pool = bitcorep2p.Pool,
+	    Messages = bitcorep2p.Messages,
+	    bitcore = __webpack_require__(35),
+	    BlockHeader = bitcore.BlockHeader,
+	    bufferUtil = bitcore.util.buffer,
+	    EventEmitter = __webpack_require__(29).EventEmitter,
+	    util = __webpack_require__(21);
+
+
+	// Breadwallet uses 3, so that's good enough for us?!
+	Pool.MaxConnectedPeers = 3;
+	var MAX_GETDATA_HASHES = 50000;
+	// Random checkpoitns to use, most of these from Breadwallet BRPeerManager.m
+	// TODO: use parseInt() on the 'target' difficulty hex numbers at the end?
+	var CHECKPOINTS = [
+	    [      0, "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", 1231006505, '0x1d00ffffu' ],
+	    [  20160, "000000000f1aef56190aee63d33a373e6487132d522ff4cd98ccfc96566d461e", 1248481816, '0x1d00ffffu' ],
+	    [  40320, "0000000045861e169b5a961b7034f8de9e98022e7a39100dde3ae3ea240d7245", 1266191579, '0x1c654657u' ],
+	    [  60480, "000000000632e22ce73ed38f46d5b408ff1cff2cc9e10daaf437dfd655153837", 1276298786, '0x1c0eba64u' ],
+	    [  80640, "0000000000307c80b87edf9f6a0697e2f01db67e518c8a4d6065d1d859a3a659", 1284861847, '0x1b4766edu' ],
+	    [ 100800, "000000000000e383d43cc471c64a9a4a46794026989ef4ff9611d5acb704e47a", 1294031411, '0x1b0404cbu' ],
+	    [ 120960, "0000000000002c920cf7e4406b969ae9c807b5c4f271f490ca3de1b0770836fc", 1304131980, '0x1b0098fau' ],
+	    [ 141120, "00000000000002d214e1af085eda0a780a8446698ab5c0128b6392e189886114", 1313451894, '0x1a094a86u' ],
+	    [ 161280, "00000000000005911fe26209de7ff510a8306475b75ceffd434b68dc31943b99", 1326047176, '0x1a0d69d7u' ],
+	    [ 181440, "00000000000000e527fc19df0992d58c12b98ef5a17544696bbba67812ef0e64", 1337883029, '0x1a0a8b5fu' ],
+	    [ 201600, "00000000000003a5e28bef30ad31f1f9be706e91ae9dda54179a95c9f9cd9ad0", 1349226660, '0x1a057e08u' ],
+	    [ 221760, "00000000000000fc85dd77ea5ed6020f9e333589392560b40908d3264bd1f401", 1361148470, '0x1a04985cu' ],
+	    [ 241920, "00000000000000b79f259ad14635739aaf0cc48875874b6aeecc7308267b50fa", 1371418654, '0x1a00de15u' ],
+	    [ 262080, "000000000000000aa77be1c33deac6b8d3b7b0757d02ce72fffddc768235d0e2", 1381070552, '0x1916b0cau' ],
+	    [ 282240, "0000000000000000ef9ee7529607286669763763e0c46acfdefd8a2306de5ca8", 1390570126, '0x1901f52cu' ],
+	    [ 302400, "0000000000000000472132c4daaf358acaf461ff1c3e96577a74e5ebf91bb170", 1400928750, '0x18692842u' ],
+	    [ 322560, "000000000000000002df2dd9d4fe0578392e519610e341dd09025469f101cfa1", 1411680080, '0x181FB893u' ],
+	    [ 342720, "00000000000000000f9cfece8494800d3dcbf9583232825da640c8703bcd27e7", 1423496415, '0x1818BB87u' ]
+	];
+
+	var TESTNET_CHECKPOINTS = [
+	    [      0, "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943", 1296688602, '0x1d00ffffu' ],
+	    [  20160, "000000001cf5440e7c9ae69f655759b17a32aad141896defd55bb895b7cfc44e", 1345001466, '0x1c4d1756u' ],
+	    [  40320, "000000008011f56b8c92ff27fb502df5723171c5374673670ef0eee3696aee6d", 1355980158, '0x1d00ffffu' ],
+	    [  60480, "00000000130f90cda6a43048a58788c0a5c75fa3c32d38f788458eb8f6952cee", 1363746033, '0x1c1eca8au' ],
+	    [  80640, "00000000002d0a8b51a9c028918db3068f976e3373d586f08201a4449619731c", 1369042673, '0x1c011c48u' ],
+	    [ 100800, "0000000000a33112f86f3f7b0aa590cb4949b84c2d9c673e9e303257b3be9000", 1376543922, '0x1c00d907u' ],
+	    [ 120960, "00000000003367e56e7f08fdd13b85bbb31c5bace2f8ca2b0000904d84960d0c", 1382025703, '0x1c00df4cu' ],
+	    [ 141120, "0000000007da2f551c3acd00e34cc389a4c6b6b3fad0e4e67907ad4c7ed6ab9f", 1384495076, '0x1c0ffff0u' ],
+	    [ 161280, "0000000001d1b79a1aec5702aaa39bad593980dfe26799697085206ef9513486", 1388980370, '0x1c03fffcu' ],
+	    [ 181440, "00000000002bb4563a0ec21dc4136b37dcd1b9d577a75a695c8dd0b861e1307e", 1392304311, '0x1b336ce6u' ],
+	    [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38", 1393813869, '0x1b602ac0u' ]
+	];
+
+	function PeerManager(network) {
+	    this.connected = false;
+	    this.network = bitcore.Networks[network] || bitcore.Networks.defaultNetwork;
+	    this.pool = null;
+	    this.peers = [];
+	    this.downloadPeer = null;
+	    this.knownBlockHashes = [];
+	    // TODO: Store this somewhere better
+	    this.blocks = [];
+
+	    this._bestHeight = 0;
+	}
+
+	util.inherits(PeerManager, EventEmitter);
+
+	PeerManager.prototype.connect = function() {
+	    var self = this;
+	    if(self.connected) return;
+
+	    self.pool = new Pool();
+	    self.pool.on('peerconnect', self.peerConnected.bind(this));
+	    self.pool.on('peerready', self.peerReady.bind(this));
+	    self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
+	    self.pool.on('peerheaders', self.peerHeaders.bind(this));
+	    self.pool.on('peerinv', self.peerInv.bind(this));
+	    self.pool.on('peertx', self.peerTx.bind(this));
+	    self.pool.on('peererror', self.peerError.bind(this));
+
+	    self.pool.connect();
+	    self.connected = true;
+	    
+	    // TODO: figure out why this is needed
+	    var readyTo = setTimeout(function(){
+	        console.log('pool reconnecting');
+	        self.disconnect();
+	        self.connect();
+	    },3000);
+	    self.pool.once('peerready', function() { clearTimeout(readyTo); });
+	}
+
+	PeerManager.prototype.peerConnected = function(peer) {
+	    var self = this;
+	    console.log('peerConnected');
+	    self.peers.push(peer);
+
+	    // Only wait 2 seconds for verAck
+	    var peerTimeout = setTimeout(function() {
+	        console.log('peer timed out, disconnecting');
+	        peer.disconnect();
+	    },2000);
+	    // Clear timeout once peer is ready
+	    peer.on('ready', function() { clearTimeout(peerTimeout); });
+	    self.emit('peerconnect', self.peers.length)
+	}
+
+	PeerManager.prototype.peerReady = function(peer, addr) {
+	    var self = this;
+
+	    self._bestHeight = Math.max(self._bestHeight, peer.bestHeight);
+	    console.log('peerReady: ', addr.ip.v4);
+	    //TODO: Smarter peerDownload detection
+	    if(!self.downloadPeer) {
+	        self._setDownloadPeer(peer);
+	    } else {
+	        // Check if the new peer has a higher height, and switch
+	        // downloadPeer, if so
+	        if(peer.bestHeight > self.downloadPeer.bestHeight) {
+	            console.log('switching downloadPeer');
+	            self.downloadPeer.disconnect();
+	            self._setDownloadPeer(peer);
+	        }
+	    }
+	}
+
+	PeerManager.prototype.peerDisconnected = function(peer, addr) {
+	    var self = this;
+	    console.log('removing:', addr.ip.v4);
+	    var idx = self.peers.indexOf(peer);
+	    if(idx && self.peers[idx] == self.downloadPeer){
+	        console.log('unsetting downloadPeer');
+	        // TODO: is this good enough, or do we need to re-set it here?
+	        self.downloadPeer = null;
+	    }
+	    self.peers.splice(idx-1,1);
+	    self.emit('peerdisconnect', self.peers.length)
+	}
+
+	PeerManager.prototype.peerInv = function(peer, message) {
+	    var self = this;
+	    var txHashes = [], blockHashes = [];
+
+	    if(message.count > MAX_GETDATA_HASHES) {
+	        console.log('inv message has too many items, dropping.');
+	        return;
+	    }
+
+	    for(var i in message.inventory) {
+	        switch(message.inventory[i].type) {
+	            case 1: // TX
+	                txHashes.push(message.inventory[i]);
+	                break;
+	            case 2: // Block
+	                blockHashes.push(message.inventory[i]);
+	                break;
+	            default: break;
+	        }
+	    }
+
+	    // TODO: Check for bloom filter
+
+	    // Stole this logic from breadWallet
+	    if(txHashes.length > 10000) {
+	        console.log('too many transactions, disconnecting from peer');
+	        peer.disconnect();
+	        return;
+	    }
+
+	    if(blockHashes.length == 1 &&
+	            self.knownBlockHashes.indexOf(blockHashes[0].toString('hex')) > -1) {
+	        console.log('already had latest block, ignoring');
+	        blockHashes = [];
+	    }
+	    if(blockHashes.length == 1) {
+	        self.knownBlockHashes.push(blockHashes[0]);
+	        console.log('got new block!', blockHashes[0]);
+	        self.emit('syncstarted', self);
+	        peer.sendMessage(
+	            new Messages.GetHeaders([self.getLatestBlockHash()]));
+	    }
+	}
+
+	PeerManager.prototype.peerTx = function(peer, message) {
+	    console.log('peertx', message);
+	}
+
+	PeerManager.prototype.peerError = function(peer, e) {
+	    console.log('peererror', e);
+	    peer.disconnect();
+	}
+
+	PeerManager.prototype.peerHeaders = function(peer, message) {
+	    var self = this;
+	    //console.log('headers response');
+	    for(var i in message.headers) {
+	        var blockHeader = new BlockHeader(message.headers[i]);
+	        // TODO: This won't handle chain forks, it'll just accept the first
+	        // valid proof on top of the current chain.  It won't be able to find
+	        // another chain that grows longer than the first one seen.
+	        if(blockHeader.validProofOfWork()) {
+	            var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
+	            if(!self.blocks.length && blockHeader.hash) {
+	                // First block
+	                self.blocks.push(blockHeader.hash);
+	            } else if (prevHash == self.getLatestBlockHash()) {
+	                self.blocks.push(blockHeader.hash);
+	            } else {
+	                // TODO: do something better here?
+	                //console.log('block didnt go on chain');
+	            }
+	            var syncedHeight = self.syncedHeight();
+	            if(syncedHeight > self.bestHeight) {
+	                self.bestHeight = syncedHeight;
+	            }
+	        }
+	    }
+
+	    self.emit('syncprogress', self.syncProgress());
+	    // If we still have more messages to get
+	    if(self.syncedHeight() < self.estimatedBlockHeight()) {
+	        //console.log('getting more headers');
+	        var lastHeader = message.headers[message.headers.length - 1];
+	        peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
+	    } else {
+	        self.emit('synccomplete', self);
+	    }
+	}
+
+	PeerManager.prototype.disconnect = function() {
+	    this.connected=false;
+	    this.pool.disconnect();
+	}
+
+	PeerManager.prototype.syncProgress = function() {
+	    var self = this;
+	    //TODO: this is really crude and crappy atm
+	    return self.blocks.length /
+	        (self.estimatedBlockHeight() - self._getStartingCheckpoint()[0])
+	}
+
+	PeerManager.prototype.estimatedBlockHeight = function() {
+	    var self = this;
+	    if(!self.downloadPeer) {
+	        return 0;
+	    }
+	    return Math.max(self._bestHeight, self.syncedHeight());
+	}
+
+	PeerManager.prototype.syncedHeight = function() {
+	    var self = this;
+	    return self._getStartingCheckpoint()[0] + self.blocks.length;
+	}
+
+	PeerManager.prototype.bestHeight = function() {
+	    var self = this;
+	    return Math.max(self.syncedHeight(), self._bestHeight)
+	}
+
+	PeerManager.prototype.getLatestBlockHash = function() {
+	    var self = this;
+	    return self.blocks[self.blocks.length-1]
+	}
+
+	PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
+	    var self = this;
+	    // TODO:
+	    //if (blockHeight > self.syncedBlockHeight()) {
+	        //// future block, assume 10 minutes per block after last block
+	        //return self.lastBlock.timestamp + (blockHeight - self.lastBlockHeight)*10*60;
+	    //}
+	}
+
+	PeerManager.prototype._setDownloadPeer = function(peer) {
+	    var self = this;
+	    self.emit('syncstarted', self);
+	    self.downloadPeer = peer;
+	    // TODO: For now we always just start with startingBlock, fix that
+	    peer.sendMessage( new Messages.GetHeaders([self._getStartingCheckpoint()[1]]) );
+	}
+
+	PeerManager.prototype._getStartingCheckpoint = function() {
+	    var self = this;
+	    // TODO: base this on wallet start time (?)
+	    if(self.network && self.network.alias == 'mainnet') {
+	        return CHECKPOINTS[CHECKPOINTS.length - 2];
+	    } else {
+	        return TESTNET_CHECKPOINTS[TESTNET_CHECKPOINTS.length - 1];
+	    }
+	}
+
+
+	module.exports = PeerManager;
+
+
+/***/ },
+/* 163 */,
+/* 164 */,
+/* 165 */,
+/* 166 */,
+/* 167 */,
+/* 168 */,
+/* 169 */,
+/* 170 */,
+/* 171 */,
+/* 172 */,
+/* 173 */,
+/* 174 */,
+/* 175 */,
+/* 176 */,
+/* 177 */,
+/* 178 */,
+/* 179 */,
+/* 180 */,
+/* 181 */,
+/* 182 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -40835,7 +40876,7 @@
 
 
 /***/ },
-/* 147 */
+/* 183 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports.read = function(buffer, offset, isLE, mLen, nBytes) {
@@ -40925,7 +40966,7 @@
 
 
 /***/ },
-/* 148 */
+/* 184 */
 /***/ function(module, exports, __webpack_require__) {
 
 	
@@ -40964,10 +41005,10 @@
 
 
 /***/ },
-/* 149 */
+/* 185 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(70)
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(99)
 
 	var zeroBuffer = new Buffer(128)
 	zeroBuffer.fill(0)
@@ -41014,7 +41055,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 150 */
+/* 186 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {var intSize = 4;
@@ -41055,7 +41096,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 151 */
+/* 187 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/*
@@ -41067,7 +41108,7 @@
 	 * See http://pajhome.org.uk/crypt/md5 for more info.
 	 */
 
-	var helpers = __webpack_require__(150);
+	var helpers = __webpack_require__(186);
 
 	/*
 	 * Calculate the MD5 of an array of little-endian words, and a bit length
@@ -41216,15 +41257,15 @@
 
 
 /***/ },
-/* 152 */
+/* 188 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(50);
-	var Transform = __webpack_require__(51);
-	var inherits = __webpack_require__(38);
-	var modes = __webpack_require__(52);
-	var StreamCipher = __webpack_require__(77);
-	var ebtk = __webpack_require__(71);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(70);
+	var Transform = __webpack_require__(71);
+	var inherits = __webpack_require__(53);
+	var modes = __webpack_require__(72);
+	var StreamCipher = __webpack_require__(106);
+	var ebtk = __webpack_require__(100);
 
 	inherits(Decipher, Transform);
 	function Decipher(mode, key, iv) {
@@ -41292,11 +41333,11 @@
 	}
 
 	var modelist = {
-	  ECB: __webpack_require__(75),
-	  CBC: __webpack_require__(72),
-	  CFB: __webpack_require__(73),
-	  OFB: __webpack_require__(76),
-	  CTR: __webpack_require__(74)
+	  ECB: __webpack_require__(104),
+	  CBC: __webpack_require__(101),
+	  CFB: __webpack_require__(102),
+	  OFB: __webpack_require__(105),
+	  CTR: __webpack_require__(103)
 	};
 
 	module.exports = function (crypto) {
@@ -41340,15 +41381,15 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 153 */
+/* 189 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(50);
-	var Transform = __webpack_require__(51);
-	var inherits = __webpack_require__(38);
-	var modes = __webpack_require__(52);
-	var ebtk = __webpack_require__(71);
-	var StreamCipher = __webpack_require__(77);
+	/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(70);
+	var Transform = __webpack_require__(71);
+	var inherits = __webpack_require__(53);
+	var modes = __webpack_require__(72);
+	var ebtk = __webpack_require__(100);
+	var StreamCipher = __webpack_require__(106);
 	inherits(Cipher, Transform);
 	function Cipher(mode, key, iv) {
 	  if (!(this instanceof Cipher)) {
@@ -41409,11 +41450,11 @@
 	  return out;
 	};
 	var modelist = {
-	  ECB: __webpack_require__(75),
-	  CBC: __webpack_require__(72),
-	  CFB: __webpack_require__(73),
-	  OFB: __webpack_require__(76),
-	  CTR: __webpack_require__(74)
+	  ECB: __webpack_require__(104),
+	  CBC: __webpack_require__(101),
+	  CFB: __webpack_require__(102),
+	  OFB: __webpack_require__(105),
+	  CTR: __webpack_require__(103)
 	};
 	module.exports = function (crypto) {
 	  function createCipheriv(suite, password, iv) {
@@ -41455,18 +41496,18 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 154 */
+/* 190 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function (crypto, exports) {
 	  exports = exports || {};
-	  var ciphers = __webpack_require__(153)(crypto);
+	  var ciphers = __webpack_require__(189)(crypto);
 	  exports.createCipher = ciphers.createCipher;
 	  exports.createCipheriv = ciphers.createCipheriv;
-	  var deciphers = __webpack_require__(152)(crypto);
+	  var deciphers = __webpack_require__(188)(crypto);
 	  exports.createDecipher = deciphers.createDecipher;
 	  exports.createDecipheriv = deciphers.createDecipheriv;
-	  var modes = __webpack_require__(52);
+	  var modes = __webpack_require__(72);
 	  function listCiphers () {
 	    return Object.keys(modes);
 	  }
@@ -41476,7 +41517,7 @@
 
 
 /***/ },
-/* 155 */
+/* 191 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {module.exports = function(crypto) {
@@ -41567,7 +41608,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 156 */
+/* 192 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {
@@ -41779,7 +41820,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
 
 /***/ },
-/* 157 */
+/* 193 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function (Buffer) {
@@ -41862,7 +41903,7 @@
 
 
 /***/ },
-/* 158 */
+/* 194 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var exports = module.exports = function (alg) {
@@ -41872,15 +41913,15 @@
 	}
 
 	var Buffer = __webpack_require__(1).Buffer
-	var Hash   = __webpack_require__(157)(Buffer)
+	var Hash   = __webpack_require__(193)(Buffer)
 
-	exports.sha1 = __webpack_require__(159)(Buffer, Hash)
-	exports.sha256 = __webpack_require__(160)(Buffer, Hash)
-	exports.sha512 = __webpack_require__(161)(Buffer, Hash)
+	exports.sha1 = __webpack_require__(195)(Buffer, Hash)
+	exports.sha256 = __webpack_require__(196)(Buffer, Hash)
+	exports.sha512 = __webpack_require__(197)(Buffer, Hash)
 
 
 /***/ },
-/* 159 */
+/* 195 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/*
@@ -41892,7 +41933,7 @@
 	 * See http://pajhome.org.uk/crypt/md5 for details.
 	 */
 
-	var inherits = __webpack_require__(17).inherits
+	var inherits = __webpack_require__(21).inherits
 
 	module.exports = function (Buffer, Hash) {
 
@@ -42024,7 +42065,7 @@
 
 
 /***/ },
-/* 160 */
+/* 196 */
 /***/ function(module, exports, __webpack_require__) {
 
 	
@@ -42036,7 +42077,7 @@
 	 *
 	 */
 
-	var inherits = __webpack_require__(17).inherits
+	var inherits = __webpack_require__(21).inherits
 
 	module.exports = function (Buffer, Hash) {
 
@@ -42177,10 +42218,10 @@
 
 
 /***/ },
-/* 161 */
+/* 197 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var inherits = __webpack_require__(17).inherits
+	var inherits = __webpack_require__(21).inherits
 
 	module.exports = function (Buffer, Hash) {
 	  var K = [
@@ -42427,10 +42468,10 @@
 
 
 /***/ },
-/* 162 */
+/* 198 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var pbkdf2Export = __webpack_require__(155)
+	var pbkdf2Export = __webpack_require__(191)
 
 	module.exports = function (crypto, exports) {
 	  exports = exports || {}
@@ -42445,13 +42486,13 @@
 
 
 /***/ },
-/* 163 */
+/* 199 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(global, Buffer) {(function() {
 	  var g = ('undefined' === typeof window ? global : window) || {}
 	  _crypto = (
-	    g.crypto || g.msCrypto || __webpack_require__(178)
+	    g.crypto || g.msCrypto || __webpack_require__(214)
 	  )
 	  module.exports = function(size) {
 	    // Modern Browsers
@@ -42478,7 +42519,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), __webpack_require__(1).Buffer))
 
 /***/ },
-/* 164 */
+/* 200 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_RESULT__;/* WEBPACK VAR INJECTION */(function(module, global) {/*! https://mths.be/punycode v1.3.2 by @mathias */
@@ -43010,10 +43051,10 @@
 
 	}(this));
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(48)(module), (function() { return this; }())))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(68)(module), (function() { return this; }())))
 
 /***/ },
-/* 165 */
+/* 201 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -43103,7 +43144,7 @@
 
 
 /***/ },
-/* 166 */
+/* 202 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -43194,24 +43235,24 @@
 
 
 /***/ },
-/* 167 */
+/* 203 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	exports.decode = exports.parse = __webpack_require__(165);
-	exports.encode = exports.stringify = __webpack_require__(166);
+	exports.decode = exports.parse = __webpack_require__(201);
+	exports.encode = exports.stringify = __webpack_require__(202);
 
 
 /***/ },
-/* 168 */
+/* 204 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(25)
+	module.exports = __webpack_require__(30)
 
 
 /***/ },
-/* 169 */
+/* 205 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = Array.isArray || function (arr) {
@@ -43220,41 +43261,41 @@
 
 
 /***/ },
-/* 170 */
+/* 206 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(78)
+	module.exports = __webpack_require__(107)
 
 
 /***/ },
-/* 171 */
+/* 207 */
 /***/ function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(79);
-	exports.Stream = __webpack_require__(33);
+	exports = module.exports = __webpack_require__(108);
+	exports.Stream = __webpack_require__(41);
 	exports.Readable = exports;
-	exports.Writable = __webpack_require__(54);
-	exports.Duplex = __webpack_require__(25);
-	exports.Transform = __webpack_require__(53);
-	exports.PassThrough = __webpack_require__(78);
+	exports.Writable = __webpack_require__(74);
+	exports.Duplex = __webpack_require__(30);
+	exports.Transform = __webpack_require__(73);
+	exports.PassThrough = __webpack_require__(107);
 
 
 /***/ },
-/* 172 */
+/* 208 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(53)
+	module.exports = __webpack_require__(73)
 
 
 /***/ },
-/* 173 */
+/* 209 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(54)
+	module.exports = __webpack_require__(74)
 
 
 /***/ },
-/* 174 */
+/* 210 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -43283,7 +43324,7 @@
 
 
 /***/ },
-/* 175 */
+/* 211 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -43307,7 +43348,7 @@
 	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 	// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-	var punycode = __webpack_require__(164);
+	var punycode = __webpack_require__(200);
 
 	exports.parse = urlParse;
 	exports.resolve = urlResolve;
@@ -43379,7 +43420,7 @@
 	      'gopher:': true,
 	      'file:': true
 	    },
-	    querystring = __webpack_require__(167);
+	    querystring = __webpack_require__(203);
 
 	function urlParse(url, parseQueryString, slashesDenoteHost) {
 	  if (url && isObject(url) && url instanceof Url) return url;
@@ -43996,7 +44037,7 @@
 
 
 /***/ },
-/* 176 */
+/* 212 */
 /***/ function(module, exports, __webpack_require__) {
 
 	if (typeof Object.create === 'function') {
@@ -44025,7 +44066,7 @@
 
 
 /***/ },
-/* 177 */
+/* 213 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function isBuffer(arg) {
@@ -44036,13 +44077,13 @@
 	}
 
 /***/ },
-/* 178 */
+/* 214 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* (ignored) */
 
 /***/ },
-/* 179 */
+/* 215 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* (ignored) */
