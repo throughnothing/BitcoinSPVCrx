@@ -25,7 +25,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
   pm.connect();
 
   chrome.app.window.create(
-    "html/index.html",
+    "index.html",
     {
       id: "bitcoin-spv-window",
       outerBounds: { minWidth: 400, minHeight: 600 }

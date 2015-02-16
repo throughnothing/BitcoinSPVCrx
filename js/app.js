@@ -1,4 +1,6 @@
 'use strict';
+require ('bootstrap-webpack');
+var $ = require('jquery');
 
 function onSyncProgress(request) {
   console.log('sync progress:', request.progress, request.height);
