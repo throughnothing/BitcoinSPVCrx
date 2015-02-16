@@ -68,7 +68,7 @@
 	  pm.on('peerdisconnect', function(numPeers) {
 	    chrome.runtime.sendMessage({type: "peerdisconnect", numPeers: numPeers});
 	  });
-	  pm.connect();
+	  //pm.connect();
 
 	  chrome.app.window.create(
 	    "index.html",
