@@ -209,8 +209,8 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
                 //console.log('block didnt go on chain');
             }
             var syncedHeight = self.syncedHeight();
-            if(syncedHeight > self.bestHeight) {
-                self.bestHeight = syncedHeight;
+            if(syncedHeight > self._bestHeight) {
+                self._bestHeight = syncedHeight;
             }
         }
     }
