@@ -13,6 +13,7 @@ var bitcorep2p = require('bitcore-p2p'),
 Pool.MaxConnectedPeers = 3;
 var MAX_GETDATA_HASHES = 50000;
 // Random checkpoitns to use, most of these from Breadwallet BRPeerManager.m
+// TODO: use parseInt() on the 'target' difficulty hex numbers at the end?
 var CHECKPOINTS = [
     [      0, "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", 1231006505, '0x1d00ffffu' ],
     [  20160, "000000000f1aef56190aee63d33a373e6487132d522ff4cd98ccfc96566d461e", 1248481816, '0x1d00ffffu' ],
@@ -35,17 +36,17 @@ var CHECKPOINTS = [
 ];
 
 var TESTNET_CHECKPOINTS = [
-    [      0, "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943", 1296688602, '1d00ffffu' ],
-    [  20160, "000000001cf5440e7c9ae69f655759b17a32aad141896defd55bb895b7cfc44e", 1345001466, '1c4d1756u' ],
-    [  40320, "000000008011f56b8c92ff27fb502df5723171c5374673670ef0eee3696aee6d", 1355980158, '1d00ffffu' ],
-    [  60480, "00000000130f90cda6a43048a58788c0a5c75fa3c32d38f788458eb8f6952cee", 1363746033, '1c1eca8au' ],
-    [  80640, "00000000002d0a8b51a9c028918db3068f976e3373d586f08201a4449619731c", 1369042673, '1c011c48u' ],
-    [ 100800, "0000000000a33112f86f3f7b0aa590cb4949b84c2d9c673e9e303257b3be9000", 1376543922, '1c00d907u' ],
-    [ 120960, "00000000003367e56e7f08fdd13b85bbb31c5bace2f8ca2b0000904d84960d0c", 1382025703, '1c00df4cu' ],
-    [ 141120, "0000000007da2f551c3acd00e34cc389a4c6b6b3fad0e4e67907ad4c7ed6ab9f", 1384495076, '1c0ffff0u' ],
-    [ 161280, "0000000001d1b79a1aec5702aaa39bad593980dfe26799697085206ef9513486", 1388980370, '1c03fffcu' ],
-    [ 181440, "00000000002bb4563a0ec21dc4136b37dcd1b9d577a75a695c8dd0b861e1307e", 1392304311, '1b336ce6u' ],
-    [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38", 1393813869, '1b602ac0u' ]
+    [      0, "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943", 1296688602, '0x1d00ffffu' ],
+    [  20160, "000000001cf5440e7c9ae69f655759b17a32aad141896defd55bb895b7cfc44e", 1345001466, '0x1c4d1756u' ],
+    [  40320, "000000008011f56b8c92ff27fb502df5723171c5374673670ef0eee3696aee6d", 1355980158, '0x1d00ffffu' ],
+    [  60480, "00000000130f90cda6a43048a58788c0a5c75fa3c32d38f788458eb8f6952cee", 1363746033, '0x1c1eca8au' ],
+    [  80640, "00000000002d0a8b51a9c028918db3068f976e3373d586f08201a4449619731c", 1369042673, '0x1c011c48u' ],
+    [ 100800, "0000000000a33112f86f3f7b0aa590cb4949b84c2d9c673e9e303257b3be9000", 1376543922, '0x1c00d907u' ],
+    [ 120960, "00000000003367e56e7f08fdd13b85bbb31c5bace2f8ca2b0000904d84960d0c", 1382025703, '0x1c00df4cu' ],
+    [ 141120, "0000000007da2f551c3acd00e34cc389a4c6b6b3fad0e4e67907ad4c7ed6ab9f", 1384495076, '0x1c0ffff0u' ],
+    [ 161280, "0000000001d1b79a1aec5702aaa39bad593980dfe26799697085206ef9513486", 1388980370, '0x1c03fffcu' ],
+    [ 181440, "00000000002bb4563a0ec21dc4136b37dcd1b9d577a75a695c8dd0b861e1307e", 1392304311, '0x1b336ce6u' ],
+    [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38", 1393813869, '0x1b602ac0u' ]
 ];
 
 function PeerManager(network) {
@@ -281,7 +282,7 @@ PeerManager.prototype._getStartingCheckpoint = function() {
     var self = this;
     // TODO: base this on wallet start time (?)
     if(self.network && self.network.alias == 'mainnet') {
-        return CHECKPOINTS[CHECKPOINTS.length - 1];
+        return CHECKPOINTS[CHECKPOINTS.length - 2];
     } else {
         return TESTNET_CHECKPOINTS[TESTNET_CHECKPOINTS.length - 1];
     }

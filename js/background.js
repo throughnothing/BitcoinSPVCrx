@@ -1,5 +1,6 @@
 'use strict';
 var PeerManager = require('./peermanager');
+// TODO: include the wallet here as well
 
 /**
  * Listens for the app launching, then creates the window.
@@ -28,7 +29,9 @@ chrome.app.runtime.onLaunched.addListener(function() {
     "index.html",
     {
       id: "bitcoin-spv-window",
-      outerBounds: { minWidth: 400, minHeight: 600 }
+      outerBounds: { minWidth: 400, minHeight: 600 },
+      innerBounds: { maxWidth: 600, maxHeight: 800 },
+      frame: { type: 'chrome' }
     },
     function(window) {
       window.onClosed.addListener(function() {

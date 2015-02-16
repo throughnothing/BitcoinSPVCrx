@@ -5,7 +5,7 @@ module.exports = {
   cache: true,
   entry: {
     background: './js/background',
-    app: './js/app'
+    app: './js/index'
   },
   output: {
     path: __dirname + '/build',
@@ -22,7 +22,7 @@ module.exports = {
   },
   module: {
     loaders: [
-      //{ test: /\.jsx?$/, loader: 'jsx-loader?harmony' },
+      { test: /\.jsx?$/, loader: 'jsx-loader?harmony', exclude: [/node_modules/, /config\.js/] },
       { test: /\.json$/, loader: 'json-loader' },
       // Bootstrap-webpack stuff
 
@@ -31,7 +31,6 @@ module.exports = {
       { test: /bootstrap\/js\//, loader: 'imports?jQuery=jquery' },
 
       // Needed for the css-loader when [bootstrap-webpack](https://github.com/bline/bootstrap-webpack)
-      // loads bootstrap's css.
       { test: /\.woff2$/,                      loader: "url?limit=10000&minetype=application/x-font-woff" },
       { test: /\.woff(\?v=\d+\.\d+\.\d+)?$/,   loader: "url?limit=10000&minetype=application/x-font-woff" },
       { test: /\.ttf(\?v=\d+\.\d+\.\d+)?$/,    loader: "url?limit=10000&minetype=application/octet-stream" },
@@ -40,7 +39,6 @@ module.exports = {
     ]
 
   },
-
   plugins:[
     // make sure that the files in the generated bundle are included in the
     // same order between builds

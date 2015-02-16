@@ -1,5 +1,65 @@
 body {
-  min-height: 2000px;
+  min-height: 1000px;
   padding-top: 55px;
 }
 
+/* Wrapper for page content to push down footer */
+#wrap {
+  min-height: 100%;
+  height: auto !important;
+  height: 100%;
+  /* Negative indent footer by its height */
+  margin: 0 auto -60px;
+  /* Pad bottom by footer height */
+  padding: 0 0 60px;
+}
+
+/* Set the fixed height of the footer here */
+#footer {
+  height: 60px !important;
+  background-color: transparent !important;
+}
+
+/* Custom page CSS
+-------------------------------------------------- */
+/* Not required for template or sticky footer method. */
+
+#wrap > .container {
+  padding: 10px 15px 0;
+}
+
+#footer > .container {
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+button.navbar-toggle {
+  position: absolute !important;
+  float: none !important;
+  top: 0;
+  left: 15px;
+}
+
+.navbar-header {
+  float:none !important;
+  width:100% !important;
+  padding:10px !important;
+  padding-top: 15px !important;
+  -webkit-app-region: drag;
+}
+.navbar-brand {
+  font-size:20pt !important;
+  float:none !important;
+  padding: 0 !important;
+}
+#bottomNav {
+  padding:5px;
+}
+#bottomNav a {
+    font-size:14pt;
+    color:#ddd;
+    text-decoration:none;
+}
+#bottomNav a:hover {
+    color:#fff;
+}
