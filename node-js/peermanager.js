@@ -1,6 +1,6 @@
 'use strict';
 var PeerManager = require('../js/peermanager');
-var pm = new PeerManager('testnet');
+var pm = new PeerManager(process.env.BTC_NETWORK || 'testnet');
 pm.on('syncprogress', function(progress) {
     var height = pm.syncedHeight();
     console.log('syncProgress:', progress, 'height:', height);
