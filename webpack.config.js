@@ -4,8 +4,8 @@ var webpack = require('webpack');
 module.exports = {
   cache: true,
   entry: {
-    background: './js/background',
-    app: './js/index'
+    background: './backgroundjs/background',
+    app: './appjs/index'
   },
   output: {
     path: __dirname + '/build',
@@ -15,9 +15,9 @@ module.exports = {
     extensions: ['', '.js', '.jsx', '.json'],
     alias: {
       net: 'chrome-net',
-      dns: __dirname + '/js/chrome-statdns',
+      dns: __dirname + '/backgroundjs/chrome-statdns',
       dgram: 'chrome-dgram',
-      lodash: __dirname + '/js/lodash'
+      lodash: __dirname + '/backgroundjs/lodash'
     }
   },
   module: {
