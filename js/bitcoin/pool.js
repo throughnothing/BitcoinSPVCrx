@@ -1,7 +1,6 @@
 'use strict';
-var bitcorep2p = require('bitcore-p2p'),
-    Pool = bitcorep2p.Pool,
-    Messages = bitcorep2p.Messages,
+var P2P = require('bitcore-p2p'),
+    Messages = P2P.Messages,
     bitcore = require('bitcore'),
     BlockHeader = bitcore.BlockHeader,
     bufferUtil = bitcore.util.buffer,
@@ -10,7 +9,7 @@ var bitcorep2p = require('bitcore-p2p'),
 
 
 // Breadwallet uses 3, so that's good enough for us?!
-Pool.MaxConnectedPeers = 3;
+P2P.Pool.MaxConnectedPeers = 3;
 var MAX_GETDATA_HASHES = 50000;
 // Random checkpoitns to use, most of these from Breadwallet BRPeerManager.m
 // TODO: use parseInt() on the 'target' difficulty hex numbers at the end?
@@ -49,7 +48,7 @@ var TESTNET_CHECKPOINTS = [
     [ 201600, "0000000000376bb71314321c45de3015fe958543afcbada242a3b1b072498e38", 1393813869, '0x1b602ac0u' ]
 ];
 
-function PeerManager(network) {
+function Pool(network) {
     this.connected = false;
     this.network = bitcore.Networks[network] || bitcore.Networks.defaultNetwork;
     this.pool = null;
@@ -62,13 +61,13 @@ function PeerManager(network) {
     this._bestHeight = 0;
 }
 
-util.inherits(PeerManager, EventEmitter);
+util.inherits(Pool, EventEmitter);
 
-PeerManager.prototype.connect = function() {
+Pool.prototype.connect = function() {
     var self = this;
     if(self.connected) return;
 
-    self.pool = new Pool();
+    self.pool = new P2P.Pool();
     self.pool.on('peerconnect', self.peerConnected.bind(this));
     self.pool.on('peerready', self.peerReady.bind(this));
     self.pool.on('peerdisconnect', self.peerDisconnected.bind(this));
@@ -89,7 +88,7 @@ PeerManager.prototype.connect = function() {
     self.pool.once('peerready', function() { clearTimeout(readyTo); });
 }
 
-PeerManager.prototype.peerConnected = function(peer) {
+Pool.prototype.peerConnected = function(peer) {
     var self = this;
     console.log('peerConnected');
     self.peers.push(peer);
@@ -104,7 +103,7 @@ PeerManager.prototype.peerConnected = function(peer) {
     self.emit('peerconnect', self.peers.length)
 }
 
-PeerManager.prototype.peerReady = function(peer, addr) {
+Pool.prototype.peerReady = function(peer, addr) {
     var self = this;
 
     self._bestHeight = Math.max(self._bestHeight, peer.bestHeight);
@@ -123,7 +122,7 @@ PeerManager.prototype.peerReady = function(peer, addr) {
     }
 }
 
-PeerManager.prototype.peerDisconnected = function(peer, addr) {
+Pool.prototype.peerDisconnected = function(peer, addr) {
     var self = this;
     console.log('removing:', addr.ip.v4);
     var idx = self.peers.indexOf(peer);
@@ -136,7 +135,7 @@ PeerManager.prototype.peerDisconnected = function(peer, addr) {
     self.emit('peerdisconnect', self.peers.length)
 }
 
-PeerManager.prototype.peerInv = function(peer, message) {
+Pool.prototype.peerInv = function(peer, message) {
     var self = this;
     var txHashes = [], blockHashes = [];
 
@@ -180,16 +179,16 @@ PeerManager.prototype.peerInv = function(peer, message) {
     }
 }
 
-PeerManager.prototype.peerTx = function(peer, message) {
+Pool.prototype.peerTx = function(peer, message) {
     console.log('peertx', message);
 }
 
-PeerManager.prototype.peerError = function(peer, e) {
+Pool.prototype.peerError = function(peer, e) {
     console.log('peererror', e);
     peer.disconnect();
 }
 
-PeerManager.prototype.peerHeaders = function(peer, message) {
+Pool.prototype.peerHeaders = function(peer, message) {
     var self = this;
     //console.log('headers response');
     for(var i in message.headers) {
@@ -226,19 +225,19 @@ PeerManager.prototype.peerHeaders = function(peer, message) {
     }
 }
 
-PeerManager.prototype.disconnect = function() {
+Pool.prototype.disconnect = function() {
     this.connected=false;
     this.pool.disconnect();
 }
 
-PeerManager.prototype.syncProgress = function() {
+Pool.prototype.syncProgress = function() {
     var self = this;
     //TODO: this is really crude and crappy atm
     return self.blocks.length /
         (self.estimatedBlockHeight() - self._getStartingCheckpoint()[0])
 }
 
-PeerManager.prototype.estimatedBlockHeight = function() {
+Pool.prototype.estimatedBlockHeight = function() {
     var self = this;
     if(!self.downloadPeer) {
         return 0;
@@ -246,22 +245,22 @@ PeerManager.prototype.estimatedBlockHeight = function() {
     return Math.max(self._bestHeight, self.syncedHeight());
 }
 
-PeerManager.prototype.syncedHeight = function() {
+Pool.prototype.syncedHeight = function() {
     var self = this;
     return self._getStartingCheckpoint()[0] + self.blocks.length;
 }
 
-PeerManager.prototype.bestHeight = function() {
+Pool.prototype.bestHeight = function() {
     var self = this;
     return Math.max(self.syncedHeight(), self._bestHeight)
 }
 
-PeerManager.prototype.getLatestBlockHash = function() {
+Pool.prototype.getLatestBlockHash = function() {
     var self = this;
     return self.blocks[self.blocks.length-1]
 }
 
-PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
+Pool.prototype.timestampForBlockHeight = function(blockHeight) {
     var self = this;
     // TODO:
     //if (blockHeight > self.syncedBlockHeight()) {
@@ -270,7 +269,7 @@ PeerManager.prototype.timestampForBlockHeight = function(blockHeight) {
     //}
 }
 
-PeerManager.prototype._setDownloadPeer = function(peer) {
+Pool.prototype._setDownloadPeer = function(peer) {
     var self = this;
     self.emit('syncstarted', self);
     self.downloadPeer = peer;
@@ -278,7 +277,7 @@ PeerManager.prototype._setDownloadPeer = function(peer) {
     peer.sendMessage( new Messages.GetHeaders([self._getStartingCheckpoint()[1]]) );
 }
 
-PeerManager.prototype._getStartingCheckpoint = function() {
+Pool.prototype._getStartingCheckpoint = function() {
     var self = this;
     // TODO: base this on wallet start time (?)
     if(self.network && self.network.alias == 'mainnet') {
@@ -289,4 +288,4 @@ PeerManager.prototype._getStartingCheckpoint = function() {
 }
 
 
-module.exports = PeerManager;
+module.exports = Pool;

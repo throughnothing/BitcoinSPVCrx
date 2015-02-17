@@ -1,11 +1,11 @@
 'use strict';
 
-require ('bootstrap-webpack!../bootstrap.config.js');
+require ('bootstrap-webpack!../../bootstrap.config.js');
 var $ = require('jquery'),
     QRCode = require('./qrcode'),
     React = require('react'),
     router = require('./router'),
-    messaging = require('./messaging');
+    messaging = require('../chrome/messaging');
 
 
 router.run((Handler, state) => {

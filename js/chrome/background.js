@@ -1,5 +1,5 @@
 'use strict';
-var PeerManager = require('./peermanager');
+var Pool = require('../bitcoin/pool');
 // TODO: include the wallet here as well
 
 /**
@@ -9,21 +9,21 @@ var PeerManager = require('./peermanager');
  * @see http://developer.chrome.com/apps/app.window.html
  */
 chrome.app.runtime.onLaunched.addListener(function() {
-  var pm = new PeerManager();
-  pm.on('syncprogress', function(progress) {
+  var pool = new Pool();
+  pool.on('syncprogress', function(progress) {
     chrome.runtime.sendMessage(
-      {type: "syncprogress", progress: progress, height: pm.syncedHeight()});
+      {type: "syncprogress", progress: progress, height: pool.syncedHeight()});
   });
-  pm.on('synccomplete', function() {
-    chrome.runtime.sendMessage({type: "synccomplete", height: pm.syncedHeight()});
+  pool.on('synccomplete', function() {
+    chrome.runtime.sendMessage({type: "synccomplete", height: pool.syncedHeight()});
   });
-  pm.on('peerconnect', function(numPeers) {
+  pool.on('peerconnect', function(numPeers) {
     chrome.runtime.sendMessage({type: "peerconnect", numPeers: numPeers});
   });
-  pm.on('peerdisconnect', function(numPeers) {
+  pool.on('peerdisconnect', function(numPeers) {
     chrome.runtime.sendMessage({type: "peerdisconnect", numPeers: numPeers});
   });
-  pm.connect();
+  pool.connect();
 
   chrome.app.window.create(
     "index.html",
@@ -35,7 +35,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
     },
     function(window) {
       window.onClosed.addListener(function() {
-        pm.disconnect();
+        pool.disconnect();
         console.log('Shut down.');
       });
     }

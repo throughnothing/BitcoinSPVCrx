@@ -36,7 +36,7 @@ proceed with the development requirements below.
 
 To build run: `npm run build`
 
-Whenever you make changes to the javascript in the `js/` directory, you will
+Whenever you make changes to the javascript in the `*js/` directories, you will
 need to run this again before re-launching the app from Chrome.
 
 ## Notes
