@@ -13,11 +13,13 @@ come up with something better.  Suggestions welcome!
 ## Running in Chrome
 
 To run the app, you *do not* need to install the developer requirements
-listed below if you don't want to modify the code.
+listed below if you don't want to modify the code.  To run the app without
+building, you should check out the `master-built` directory, which has the 
+`build` directory files built and updated from master periodically.
 
-Simply enable "Developer mode" checkbox in the upper-right-hand corner of
-`chrome://extensions` and then click "Load unpacked extension..." and pick
-the `build/` directory of this repo.
+Simply check out `master-built`, enable "Developer mode" checkbox in the
+upper-right-hand corner of `chrome://extensions` and then click
+"Load unpacked extension..." and pick the `build/` directory of this repo.
 
 The `build/manifest.json`, along with the `build/js/background.js` file that
 it points to will tell chrome how to run everything.
