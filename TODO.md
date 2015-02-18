@@ -3,6 +3,7 @@
 * Standardize tab spacing to 2 (some files still have 4)
 * Pretty Logo, Better Project Name
 * Config + storage
+  * http://www.html5rocks.com/en/tutorials/indexeddb/todo/
   * Different stores for 'background' stuff and 'app/frontend' stuff?
   * Encrypt storage?
   * Allow storing to GDrive or some other cloud storage/sync?

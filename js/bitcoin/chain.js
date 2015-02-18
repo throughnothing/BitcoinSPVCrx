@@ -16,7 +16,7 @@ function Chain(options) {
   this._load();
 }
 
-Chain.prototype._load() = function() {
+Chain.prototype._load = function() {
   // TODO: Load the MAINNET_CHECKPOINTS
 }
 
