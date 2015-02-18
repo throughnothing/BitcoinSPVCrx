@@ -2,6 +2,7 @@
 var Pool = require('../bitcoin/pool');
 // TODO: include the wallet here as well
 
+
 /**
  * Listens for the app launching, then creates the window.
  *
