@@ -12,6 +12,12 @@ function Chain(options) {
   this.options = options || {};
   this.network = this.options.network || bitcore.Networks.defaultNetwork;
   this.blocks = [];
+
+  this._load();
+}
+
+Chain.prototype._load() = function() {
+  // TODO: Load the MAINNET_CHECKPOINTS
 }
 
 Chain.prototype.add = function(blockHeader) {
