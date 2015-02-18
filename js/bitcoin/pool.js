@@ -21,15 +21,13 @@ function Pool(options) {
   this.network = bitcore.Networks[this.options.network]
     || bitcore.Networks.defaultNetwork;
   this.connected = false;
-
+  this.chain = null;
+  this.pool = null;
   this.peers = {
     loader: null,
     pending: [],
     connected: []
   };
-
-  this.chain = null;
-  this.pool = null;
 }
 util.inherits(Pool, EventEmitter);
 
@@ -46,6 +44,7 @@ Pool.prototype.connect = function() {
   this.pool.on('peerheaders', this._handlePeerHeaders.bind(this));
   this.pool.on('peerinv', this._handlePeerInv.bind(this));
   this.pool.on('peererror', this._handlePeerError.bind(this));
+  this.pool.on('peererror', this._handlePeerError.bind(this));
 
   this.pool.connect();
   this.connected = true;
@@ -59,14 +58,25 @@ Pool.prototype.connect = function() {
   return this;
 }
 
+Pool.prototype.disconnect = function() {
+  this.connected=false;
+  this.pool.disconnect();
+  return this;
+}
+
+Pool.prototype._setLoaderPeer = function(peer) {
+  this.peers.loader = peer;
+  // TODO: For now we always just start with startingBlock, fix that
+  peer.sendMessage(new Messages.GetHeaders([this.chain.getStartingBlock().id]));
+  //peer.sendMessage(new Messages.GetBlocks([this.chain.getStartingBlock().id]));
+}
+
 Pool.prototype._handlePeerConnect = function(peer) {
   this.peers.pending.push(peer);
-
   // Only wait 2 seconds for verAck
   var peerTimeout = setTimeout(function() {
     peer.disconnect();
   },2000);
-  // Clear timeout once peer is ready
   peer.on('ready', function() { clearTimeout(peerTimeout); });
   this.emit('peer-connect', peer)
 }
@@ -107,19 +117,12 @@ Pool.prototype._handlePeerInv = function(peer, message) {
     }
   }
 
-  // TODO: Check for bloom filter
-
   // Stole this logic from breadWallet
   if(txHashes.length > 10000) {
     console.log('too many transactions, disconnecting from peer');
     peer.disconnect();
     return;
   }
-}
-
-Pool.prototype._handlePeerError = function(peer, e) {
-  this.emit('peer-error');
-  peer.disconnect();
 }
 
 Pool.prototype._handlePeerHeaders = function(peer, message) {
@@ -141,16 +144,13 @@ Pool.prototype._handlePeerHeaders = function(peer, message) {
   }
 }
 
-Pool.prototype.disconnect = function() {
-  this.connected=false;
-  this.pool.disconnect();
-  return this;
+Pool.prototype._handlePeerReject = function(peer, message) {
+  this.emit('peer-reject', message);
 }
 
-Pool.prototype._setLoaderPeer = function(peer) {
-  this.peers.loader = peer;
-  // TODO: For now we always just start with startingBlock, fix that
-  peer.sendMessage(new Messages.GetHeaders([this.chain.getStartingBlock()[1]]));
+Pool.prototype._handlePeerError = function(peer, e) {
+  this.emit('peer-error');
+  peer.disconnect();
 }
 
 Pool.prototype._removePeer = function(peer) {
@@ -170,7 +170,7 @@ Pool.prototype._removePeer = function(peer) {
 }
 
 Pool.Events = [
-  'chain-progress','chain-full', 'peer-error',
+  'chain-progress','chain-full', 'peer-error', 'peer-reject',
   'peer-connect','peer-disconnect', 'peer-ready'
 ];
 

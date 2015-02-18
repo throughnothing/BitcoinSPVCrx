@@ -1,6 +1,7 @@
 'use script';
 var EventEmitter = require('events').EventEmitter,
     bitcore = require('bitcore'),
+    BlockHeader = bitcore.BlockHeader,
     bufferUtil = bitcore.util.buffer,
     util = require('util'),
     constants = require('./constants');
@@ -8,12 +9,9 @@ var EventEmitter = require('events').EventEmitter,
 function Chain(options) {
   if (!(this instanceof Chain))
     return new Chain(options);
-
   this.options = options || {};
   this.network = this.options.network || bitcore.Networks.defaultNetwork;
   this.blocks = [];
-
-  return this;
 }
 
 Chain.prototype.add = function(blockHeader) {
@@ -25,7 +23,7 @@ Chain.prototype.add = function(blockHeader) {
     if(!this.blocks.length && blockHeader.hash) {
       // First block
       this.blocks.push(blockHeader);
-    } else if (prevHash == this.getLatestBlock().hash) {
+    } else if (prevHash == this.getLastBlock().hash) {
       this.blocks.push(blockHeader);
     } else {
       // TODO: do something better here?
@@ -34,35 +32,31 @@ Chain.prototype.add = function(blockHeader) {
   }
 }
 
-// TODO: Move to Chain()
 Chain.prototype.getStartingBlock = function() {
   // TODO: base this on wallet start time (?)
-  if(this.network && this.network.alias == 'mainnet') {
-    return constants.CHECKPOINTS[constants.CHECKPOINTS.length - 2];
-  } else {
-    return constants.TESTNET_CHECKPOINTS[constants.TESTNET_CHECKPOINTS.length - 1];
-  }
+  return new BlockHeader.fromJSON(this.getStartingBlockJSON());
 }
 
+Chain.prototype.getStartingBlockJSON = function() {
+  return constants.MAINNET_CHECKPOINTS[constants.MAINNET_CHECKPOINTS.length - 2];
+}
 
 Chain.prototype.estimatedBlockHeight = function() {
   // Estimate 10 minutes per block
-  var latestBlock = this.getLatestBlock() || this.getStartingBlock();
-  var latestBlockTime = latestBlock ?
-    latestBlock.time : this.getStartingBlock()[2];
+  var latestBlock = this.getLastBlock() || this.getStartingBlock();
   var latestBlockHeight = this.getSyncedHeight();
 
   return latestBlockHeight +
-    Math.floor((+new Date() / 1000 - latestBlockTime)/(10*60));
+    Math.floor((+new Date() / 1000 - latestBlock.time)/(10*60));
 }
 
-Chain.prototype.getLatestBlock = function() {
+Chain.prototype.getLastBlock = function() {
   return this.blocks[this.blocks.length-1]
 }
 
 Chain.prototype.syncProgress = function() {
   // from bcoin
-  var startCheckpointTime = this.getStartingBlock()[2]
+  var startCheckpointTime = this.getStartingBlock().time;
   var total = (+new Date() / 1000 - 40 * 60) - startCheckpointTime;
   var current = this.blocks[this.blocks.length - 1].time - startCheckpointTime;
   return Math.max(0, Math.min(current / total, 1));
@@ -71,7 +65,7 @@ Chain.prototype.syncProgress = function() {
 
 //TODO: do we need this method?
 Chain.prototype.getSyncedHeight = function() {
-  return this.getStartingBlock()[0] + this.blocks.length;
+  return this.getStartingBlockJSON().height + this.blocks.length;
 }
 
 Chain.prototype.timestampForBlockHeight = function(blockHeight) {
