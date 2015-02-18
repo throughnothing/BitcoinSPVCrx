@@ -3,7 +3,6 @@ var P2P = require('bitcore-p2p'),
     Messages = P2P.Messages,
     bitcore = require('bitcore'),
     BlockHeader = bitcore.BlockHeader,
-    bufferUtil = bitcore.util.buffer,
     EventEmitter = require('events').EventEmitter,
     util = require('util');
 
@@ -28,8 +27,6 @@ function Pool(options) {
     pending: [],
     connected: []
   };
-  // TODO: move the use of this to Chain() calls
-  this.blocks = [];
 
   this.chain = null;
   this.pool = null;
@@ -42,7 +39,7 @@ Pool.prototype.connect = function() {
   // TODO: pass in options to the pool?
   this.pool = new P2P.Pool();
   // TODO: pass in options (storage, etc.) to the Chain?
-  this.chain = new Chain();
+  this.chain = new Chain({ network: this.network });
   this.pool.on('peerconnect', this._handlePeerConnect.bind(this));
   this.pool.on('peerready', this._handlePeerReady.bind(this));
   this.pool.on('peerdisconnect', this._handlePeerDisconnect.bind(this));
@@ -128,25 +125,11 @@ Pool.prototype._handlePeerError = function(peer, e) {
 Pool.prototype._handlePeerHeaders = function(peer, message) {
   for(var i in message.headers) {
     var blockHeader = new BlockHeader(message.headers[i]);
-    // TODO: This won't handle chain forks, it'll just accept the first
-    // valid proof on top of the current chain.  It won't be able to find
-    // another chain that grows longer than the first one seen.
-    if(blockHeader.validProofOfWork()) {
-      var prevHash = bufferUtil.reverse(blockHeader.prevHash).toString('hex');
-      if(!this.blocks.length && blockHeader.hash) {
-        // First block
-        this.blocks.push(blockHeader);
-      } else if (prevHash == this.getLatestBlock().hash) {
-        this.blocks.push(blockHeader);
-      } else {
-        // TODO: do something better here?
-        //console.log('block didnt go on chain');
-      }
-    }
+    this.chain.add(blockHeader);
   }
 
   // TODO: this can probably go some place better/more accurate
-  this.emit('chain-progress', this.syncProgress());
+  this.emit('chain-progress', this.chain.syncProgress());
 
   // If we got 2000 messages, assume we still have more to get
   if(message.headers.length == 2000) {
@@ -164,60 +147,10 @@ Pool.prototype.disconnect = function() {
   return this;
 }
 
-//TODO: Move this method to Chain.*
-Pool.prototype.syncProgress = function() {
-  // from bcoin
-  var startCheckpointTime = this._getStartingCheckpoint()[2]
-  var total = (+new Date() / 1000 - 40 * 60) - startCheckpointTime;
-  var current = this.blocks[this.blocks.length - 1].time - startCheckpointTime;
-  return Math.max(0, Math.min(current / total, 1));
-}
-
-// TODO: Move to Chain()
-Pool.prototype.estimatedBlockHeight = function() {
-  // Estimate 10 minutes per block
-  var latestBlock = this.getLatestBlock() || this._getStartingCheckpoint();
-  var latestBlockTime = latestBlock ?
-    latestBlock.time : this._getStartingCheckpoint()[2];
-  var latestBlockHeight = this.syncedHeight();
-
-  return latestBlockHeight +
-    Math.floor((+new Date() / 1000 - latestBlockTime)/(10*60));
-}
-
-//TODO: Move to Chain()
-Pool.prototype.syncedHeight = function() {
-  return this._getStartingCheckpoint()[0] + this.blocks.length;
-}
-
-//TODO: Move to Chain()
-Pool.prototype.getLatestBlock = function() {
-  return this.blocks[this.blocks.length-1]
-}
-
-// TODO: Move this to Chain()
-Pool.prototype.timestampForBlockHeight = function(blockHeight) {
-  // TODO:
-  //if (blockHeight > this.syncedBlockHeight()) {
-  //// future block, assume 10 minutes per block after last block
-  //return this.lastBlock.timestamp + (blockHeight - this.lastBlockHeight)*10*60;
-  //}
-}
-
 Pool.prototype._setLoaderPeer = function(peer) {
   this.peers.loader = peer;
   // TODO: For now we always just start with startingBlock, fix that
-  peer.sendMessage(new Messages.GetHeaders([this._getStartingCheckpoint()[1]]));
-}
-
-// TODO: Move to Chain()
-Pool.prototype._getStartingCheckpoint = function() {
-  // TODO: base this on wallet start time (?)
-  if(this.network && this.network.alias == 'mainnet') {
-    return constants.CHECKPOINTS[constants.CHECKPOINTS.length - 2];
-  } else {
-    return constants.TESTNET_CHECKPOINTS[constants.TESTNET_CHECKPOINTS.length - 1];
-  }
+  peer.sendMessage(new Messages.GetHeaders([this.chain.getStartingBlock()[1]]));
 }
 
 Pool.prototype._removePeer = function(peer) {
