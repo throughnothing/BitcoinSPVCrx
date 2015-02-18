@@ -1,35 +1,33 @@
-function onSyncProgress(request) {
-  console.log('sync progress:', request.progress, request.height);
-}
+'use strict';
+var EventEmitter = require('events').EventEmitter,
+    util = require('util');
 
-function onSyncComplete(request) {
-  console.log('sync complete!');
-}
+function BackgroundEmitter() { }
+util.inherits(BackgroundEmitter, EventEmitter);
+var backgroundEmitter = new BackgroundEmitter();
 
-function onUpdatePeers(request, action) {
-  console.log(action, ' -- numPeers:', request.numPeers);
-}
+backgroundEmitter.on('chain-progress', function(request) {
+  console.log(request.type, request.arguments[0]);
+});
 
+var isSelf = /index.html/;
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if(sender.tab) {
-    console.log('Message from self, ignoring');
+  if(isSelf.test(sender.url)){
+    // Ignore Messages from self
     return;
   }
-
-  switch(request.type) {
-    case 'syncprogress':
-      onSyncProgress(request);
-      break;
-    case 'synccomplete':
-      onSyncComplete(request);
-      break;
-    case 'peerconnect':
-      onUpdatePeers(request, 'connect');
-      break;
-    case 'peerdisconnect':
-      onUpdatePeers(request, 'disconnect');
-      break;
-    default:
-      break;
-  }
+  // See js/chrome/background.js for list of emitted event types
+  backgroundEmitter.emit(request.type, request)
 });
+
+function backgroundSend(type, body) {
+  console.log('sending type:', type, 'body:', body);
+  chrome.runtime.sendMessage({type: type, body: arguments });
+}
+
+
+
+module.exports = {
+  backgroundEmitter: backgroundEmitter,
+  backgroundSend: backgroundSend
+}

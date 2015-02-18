@@ -6,6 +6,10 @@ var React = require('react'),
 
 module.exports = (
   <Route name="app" path="/" handler={App}>
+    {/*<Route name="transactions" handler ={Transactions}/>*/}
+    {/*<Route name="settings" handler ={Settings}/>*/}
+    {/*<Route name="about" handler ={About}/>*/}
+    {/*<DefaultRoute handler ={Receive}/>*/}
   </Route>
 );
 

@@ -44,7 +44,5 @@ module.exports = {
     // same order between builds
     new webpack.optimize.OccurenceOrderPlugin(),
     //new webpack.optimize.UglifyJsPlugin()
-    // Don't put xmlhttprequest into the browser!
-    //new webpack.IgnorePlugin(new RegExp("^xmlhttprequest$"))
   ]
 };

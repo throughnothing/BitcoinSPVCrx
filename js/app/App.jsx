@@ -11,11 +11,11 @@ module.exports = React.createClass({
   render: function() {
     return (
       <div>
-        <Header />
+        <Header ref="header" />
         <div className='container'>
           <RouteHandler />
         </div>
-        <Footer />
+        <Footer ref="footer" />
       </div>
     );
   }

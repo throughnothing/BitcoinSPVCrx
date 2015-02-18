@@ -10,19 +10,16 @@ var Pool = require('../bitcoin/pool');
  */
 chrome.app.runtime.onLaunched.addListener(function() {
   var pool = new Pool();
-  pool.on('syncprogress', function(progress) {
-    chrome.runtime.sendMessage(
-      {type: "syncprogress", progress: progress, height: pool.syncedHeight()});
+  Pool.Events.forEach(function(eventName) {
+    pool.on(eventName, function() {
+      chrome.runtime.sendMessage({
+        pool: pool,
+        type: eventName,
+        arguments: arguments
+      });
+    });
   });
-  pool.on('synccomplete', function() {
-    chrome.runtime.sendMessage({type: "synccomplete", height: pool.syncedHeight()});
-  });
-  pool.on('peerconnect', function(numPeers) {
-    chrome.runtime.sendMessage({type: "peerconnect", numPeers: numPeers});
-  });
-  pool.on('peerdisconnect', function(numPeers) {
-    chrome.runtime.sendMessage({type: "peerdisconnect", numPeers: numPeers});
-  });
+
   pool.connect();
 
   chrome.app.window.create(
@@ -30,7 +27,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
     {
       id: "bitcoin-spv-window",
       outerBounds: { minWidth: 400, minHeight: 600 },
-      innerBounds: { maxWidth: 600, maxHeight: 800 },
+      innerBounds: { maxWidth: 500, maxHeight: 700 },
       frame: { type: 'chrome' }
     },
     function(window) {
@@ -41,4 +38,18 @@ chrome.app.runtime.onLaunched.addListener(function() {
     }
   );
 
+});
+
+//TODO: is there a better way to check the sender?
+var isSelf = /background_page.html/;
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+  if(isSelf.test(sender.url)){
+    return;
+  }
+  //TODO: background.js dispatcher
+  console.log('background.js message:', request);
+  switch(request.type) {
+    default:
+      break;
+  }
 });

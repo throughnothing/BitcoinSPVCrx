@@ -1,8 +1,14 @@
 # TODO
-* Add Flux Layer for frontend
+* Add 'Flux' Layer for frontend
 * Standardize tab spacing to 2 (some files still have 4)
-* Use qrcode.js library: https://github.com/davidshimjs/qrcodejs
 * Pretty Logo, Better Project Name
+* Config + storage
+  * Different stores for 'background' stuff and 'app/frontend' stuff?
+  * Encrypt storage?
+  * Allow storing to GDrive or some other cloud storage/sync?
+  * Probably just a JSON blob
+  * store wallet start date, is_first_run,
+* first run tutorial/tooltips ?
 * Better blockChain management + persistent storage
   * So syncing after first startup is easier
 * Build out HD Wallet
