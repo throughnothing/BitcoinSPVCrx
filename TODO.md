@@ -5,7 +5,7 @@
 * Config + storage
   * http://www.html5rocks.com/en/tutorials/indexeddb/todo/
   * Different stores for 'background' stuff and 'app/frontend' stuff?
-  * Encrypt storage?
+  * Encrypt storage? (mini lock?)
   * Allow storing to GDrive or some other cloud storage/sync?
   * Probably just a JSON blob
   * store wallet start date, is_first_run,

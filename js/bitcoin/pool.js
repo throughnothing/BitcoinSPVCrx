@@ -4,7 +4,8 @@ var P2P = require('bitcore-p2p'),
     bitcore = require('bitcore'),
     BlockHeader = bitcore.BlockHeader,
     EventEmitter = require('events').EventEmitter,
-    util = require('util');
+    util = require('util'),
+    BloomFilter = require('bloom-filter');
 
 var Chain = require('./chain'),
     constants = require('./constants');
@@ -35,7 +36,7 @@ Pool.prototype.connect = function() {
   if(this.connected) return;
 
   // TODO: pass in options to the pool?
-  this.pool = new P2P.Pool();
+  this.pool = new P2P.Pool(null, { maxSize: this.size });
   // TODO: pass in options (storage, etc.) to the Chain?
   this.chain = new Chain({ network: this.network });
   this.pool.on('peerconnect', this._handlePeerConnect.bind(this));
@@ -64,11 +65,23 @@ Pool.prototype.disconnect = function() {
   return this;
 }
 
+Pool.prototype.watch = function() {
+  // TODO Set BloomFilter
+  //peer.sendMessage(new Messages.FilterLoad(this.bloom));
+}
+
 Pool.prototype._setLoaderPeer = function(peer) {
+  var self = this;
+  if(!this.chain.loaded) {
+    this.chain.once('load',function() { self._setLoaderPeer(peer) });
+    return;
+  }
+  if(this.peers.loader) {
+    return;
+  }
   this.peers.loader = peer;
-  // TODO: For now we always just start with startingBlock, fix that
-  peer.sendMessage(new Messages.GetHeaders([this.chain.getStartingBlock().id]));
-  //peer.sendMessage(new Messages.GetBlocks([this.chain.getStartingBlock().id]));
+  var lastHashIdx = this.chain.index.hashes.length - 1;
+  peer.sendMessage(new Messages.GetHeaders([this.chain.index.hashes[lastHashIdx]]));
 }
 
 Pool.prototype._handlePeerConnect = function(peer) {
@@ -131,15 +144,13 @@ Pool.prototype._handlePeerHeaders = function(peer, message) {
     this.chain.add(blockHeader);
   }
 
-  // TODO: this can probably go some place better/more accurate
-  this.emit('chain-progress', this.chain.syncProgress());
+  this.emit('chain-progress', this.chain.fillPercent());
 
   // If we got 2000 messages, assume we still have more to get
   if(message.headers.length == 2000) {
     var lastHeader = message.headers[message.headers.length - 1];
     peer.sendMessage(new Messages.GetHeaders([lastHeader.id]));
   } else {
-    // TODO: can probably emit this more accurately as well
     this.emit('chain-full');
   }
 }
