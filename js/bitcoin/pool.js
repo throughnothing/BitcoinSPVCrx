@@ -36,7 +36,7 @@ Pool.prototype.connect = function() {
   if(this.connected) return;
 
   // TODO: pass in options to the pool?
-  this.pool = new P2P.Pool(null, { maxSize: this.size });
+  this.pool = new P2P.Pool(this.network, { maxSize: this.size });
   // TODO: pass in options (storage, etc.) to the Chain?
   this.chain = new Chain({ network: this.network });
   this.pool.on('peerconnect', this._handlePeerConnect.bind(this));
@@ -65,7 +65,8 @@ Pool.prototype.disconnect = function() {
   return this;
 }
 
-Pool.prototype.watch = function() {
+Pool.prototype.watch = function(id) {
+  // id can be a bitcoir 'Address' or a String, (or an HD public key?)
   // TODO Set BloomFilter
   //peer.sendMessage(new Messages.FilterLoad(this.bloom));
 }

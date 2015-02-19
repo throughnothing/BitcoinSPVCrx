@@ -11,7 +11,11 @@ var constants = require('./constants'),
 function Chain(options) {
   if (!(this instanceof Chain))
     return new Chain(options);
+
   this.options = options || {};
+  // TODO: Force the Chain to do a full sync from the genesis block, even
+  // if it has stored state/indexes
+  this.forceFullSync = this.options.forceFullSync !== false;
   this.network = this.options.network || bitcore.Networks.defaultNetwork;
   this.blocks = {
     list: [],
@@ -157,6 +161,9 @@ Chain.prototype.fromJSON = function fromJSON(json) {
     this.index.heights.push(0);
   }
 };
+
+
+Chain.Events = [ 'load' ];
 
 
 module.exports = Chain;
