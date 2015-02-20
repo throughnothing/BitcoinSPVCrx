@@ -9,9 +9,12 @@ pool.on('chain-progress', function(progress) {
     console.log('syncProgress:', progress, 'height:', height,
       'estimatedHeight', pool.chain.estimatedBlockHeight());
 });
+
 pool.connect();
 
-pool.once('chain-full', finish);
+pool.watch('test');
+
+//pool.once('chain-full', finish);
 process.once('SIGINT', finish);
 
 var hasRun = 0;

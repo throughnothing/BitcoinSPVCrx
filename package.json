@@ -10,9 +10,9 @@
   "author": "",
   "license": "Public domain",
   "dependencies": {
-    "bitcore": "^0.10.3",
+    "bitcore": "git://github.com/throughnothing/bitcore.git#c98a71e6603af8db2d89c19bbf15e5e83e231a83",
     "bitcore-mnemonic": "^0.10.0",
-    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#4e9ee1dbe71af9a1c6d2bfd41521178764d22d46",
+    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git#6168bb2228b67a9ec5ad3891f0ea9d3cdea5041c",
     "bloom-filter": "^0.1.1",
     "bootstrap": "^3.3.2",
     "bootstrap-webpack": "0.0.3",

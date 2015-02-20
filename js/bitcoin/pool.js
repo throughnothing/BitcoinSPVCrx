@@ -2,6 +2,7 @@
 var P2P = require('bitcore-p2p'),
     Messages = P2P.Messages,
     bitcore = require('bitcore'),
+    Block = bitcore.Block,
     BlockHeader = bitcore.BlockHeader,
     EventEmitter = require('events').EventEmitter,
     util = require('util'),
@@ -65,9 +66,35 @@ Pool.prototype.disconnect = function() {
 }
 
 Pool.prototype.watch = function(id) {
+  var self = this;
   // id can be a bitcoir 'Address' or a String, (or an HD public key?)
+
+  // If we don't have a loader peer, get one and then watch
+  if(!this.peers.loader) {
+    this.once('set-loader-peer', function() { self.watch(id) });
+    return;
+  }
+
   // TODO Set BloomFilter
-  //peer.sendMessage(new Messages.FilterLoad(this.bloom));
+  var bloom = BloomFilter.create(10, 0.000001, 12, BloomFilter.BLOOM_UPDATE_NONE);
+  // Test address from mainnet block #344406
+  // 000000000000000015224dae93bf5c28f7b77e557ad8e9107fffb6cb33691ad7
+  //bloom.insert('9e866c88394b328e6ce6dae5bdbce4e3a6478e7a');
+console.log('loading filter');
+  this.peers.loader.sendMessage(new Messages.FilterLoad(bloom));
+
+  //test getdata on relevant block
+  this.pool.on('peerblock', function(peer, block) {
+    console.log('block',block);
+  });
+  this.pool.on('peermerkleblock', function(peer, block) {
+    console.log('merkleblock', block);
+  });
+
+  var hash = '000000000000000015224dae93bf5c28f7b77e557ad8e9107fffb6cb33691ad7';
+  var hash2 = '0000000000000000098e9d35ecda2fbdaa669c267d5fa078008ff7ae8467e657';
+console.log('sendingGetData');
+  self.peers.loader.sendMessage(Messages.GetData.forFilteredBlock(hash2));
 }
 
 Pool.prototype._setLoaderPeer = function(peer) {
@@ -76,11 +103,17 @@ Pool.prototype._setLoaderPeer = function(peer) {
     this.chain.once('load',function() { self._setLoaderPeer(peer) });
     return;
   }
-  if(this.peers.loader) {
+  if(!peer && self.peers.connected.length) {
+    // TODO: make it choose randomly
+    peer = self.peers.connected[0];
+  } else if(!peer || this.peers.loader) {
+    // Have no connected peers, need to wait
     return;
   }
   this.peers.loader = peer;
+  this.emit('set-loader-peer');
   var lastHashIdx = this.chain.index.hashes.length - 1;
+  // TODO: move this to an on('set-loader-peer') instead of being in here
   peer.sendMessage(new Messages.GetHeaders([this.chain.index.hashes[lastHashIdx]]));
 }
 
@@ -97,6 +130,7 @@ Pool.prototype._handlePeerConnect = function(peer) {
 Pool.prototype._handlePeerReady = function(peer, addr) {
   this._removePeer(peer);
   this.peers.connected.push(peer);
+console.log('peer-ready');
   this.emit('peer-ready', peer);
 
   //TODO: Smarter loader peer choosing
@@ -113,6 +147,7 @@ Pool.prototype._handlePeerDisconnect = function(peer, addr) {
 Pool.prototype._handlePeerInv = function(peer, message) {
   var txHashes = [], blockHashes = [];
 
+
   if(message.count > constants.MAX_GETDATA_HASHES) {
     console.log('inv message has too many items, dropping.');
     return;
@@ -124,7 +159,11 @@ Pool.prototype._handlePeerInv = function(peer, message) {
         txHashes.push(message.inventory[i]);
       break;
       case 2: // Block
+console.log("got a new block", message.inventory[i]);
         blockHashes.push(message.inventory[i]);
+      case 3: // Filtered Block
+        console.log("got a new filtered block", message.inventory[i]);
+        break;
       break;
       default: break;
     }
@@ -160,6 +199,7 @@ Pool.prototype._handlePeerReject = function(peer, message) {
 }
 
 Pool.prototype._handlePeerError = function(peer, e) {
+console.log("peer-error", e);
   this.emit('peer-error');
   peer.disconnect();
 }
@@ -182,7 +222,7 @@ Pool.prototype._removePeer = function(peer) {
 
 Pool.Events = [
   'chain-progress','chain-full', 'peer-error', 'peer-reject',
-  'peer-connect','peer-disconnect', 'peer-ready'
+  'peer-connect','peer-disconnect', 'peer-ready', 'set-loader-peer'
 ];
 
 module.exports = Pool;
