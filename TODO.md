@@ -17,6 +17,7 @@
 * Computing block height for TXs for displaying 'confirmations'
 * Use WebWorkers?!?!? http://www.html5rocks.com/en/tutorials/workers/basics/
   * Don't seem to be able to use native chrome.* api's from a web worker :(
+* Ability to add watch addresses (or look up the balance of any address)
 
 
 

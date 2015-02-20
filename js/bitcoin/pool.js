@@ -45,7 +45,6 @@ Pool.prototype.connect = function() {
   this.pool.on('peerheaders', this._handlePeerHeaders.bind(this));
   this.pool.on('peerinv', this._handlePeerInv.bind(this));
   this.pool.on('peererror', this._handlePeerError.bind(this));
-  this.pool.on('peererror', this._handlePeerError.bind(this));
 
   this.pool.connect();
   this.connected = true;
