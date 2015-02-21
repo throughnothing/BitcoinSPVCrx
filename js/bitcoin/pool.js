@@ -24,6 +24,10 @@ function Pool(options) {
   this.connected = false;
   this.chain = null;
   this.pool = null;
+  this.ping = {
+    interval: options.pingInterval || 30000,
+    _timers: []
+  }
   this.peers = {
     loader: null,
     pending: [],
@@ -99,6 +103,13 @@ Pool.prototype._handlePeerReady = function(peer, addr) {
   this.peers.connected.push(peer);
   this.emit('peer-ready', peer);
 
+  // Setup a ping interval
+  // TODO: not ideal to stick this on the peer object
+  // But its the simplest for now
+  peer._pingTimer = (setInterval(function(){
+    peer.sendMessage(new Messages.Ping());
+  },this.ping.interval));
+
   //TODO: Smarter loader peer choosing
   if(!this.peers.loader) {
     this._setLoaderPeer(peer);
@@ -107,6 +118,7 @@ Pool.prototype._handlePeerReady = function(peer, addr) {
 
 Pool.prototype._handlePeerDisconnect = function(peer, addr) {
   this._removePeer(peer);
+  clearInterval(peer._pingTimer);
   this.emit('peer-disconnect', peer)
 }
 
