@@ -25,7 +25,7 @@ function Pool(options) {
   this.chain = null;
   this.pool = null;
   this.ping = {
-    interval: options.pingInterval || 30000,
+    interval: this.options.pingInterval || 30000,
     _timers: []
   }
   this.peers = {
@@ -147,6 +147,12 @@ Pool.prototype._handlePeerInv = function(peer, message) {
     console.log('too many transactions, disconnecting from peer');
     peer.disconnect();
     return;
+  }
+
+  // If we got new blocks, GetHeaders
+  if(blockHashes.length) {
+    var lastHashIdx = this.chain.index.hashes.length - 1;
+    peer.sendMessage(new Messages.GetHeaders([this.chain.index.hashes[lastHashIdx]]));
   }
 }
 

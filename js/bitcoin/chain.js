@@ -82,12 +82,12 @@ Chain.prototype.estimatedBlockHeight = function() {
 }
 
 Chain.prototype.fillPercent = function() {
+  // Simpler way?
+  //return this.index.lastHeight / this.estimatedBlockHeight();
   // from bcoin
-  return this.index.lastHeight / this.estimatedBlockHeight();
-  // Old way
-  //var total = (+new Date() / 1000 - 40 * 60) - this.lastTsAtLoad;
-  //var current = this.index.lastTs - this.lastTsAtLoad;
-  //return Math.max(0, Math.min(current / total, 1));
+  var total = (+new Date() / 1000 - 40 * 60) - this.lastTsAtLoad;
+  var current = this.index.lastTs - this.lastTsAtLoad;
+  return Math.max(0, Math.min(current / total, 1));
 }
 
 Chain.prototype.timestampForBlockHeight = function(blockHeight) {
