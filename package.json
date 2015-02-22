@@ -10,10 +10,7 @@
   "author": "",
   "license": "Public domain",
   "dependencies": {
-    "bitcore": "^0.10.3",
-    "bitcore-mnemonic": "^0.10.0",
-    "bitcore-p2p": "git://github.com/throughnothing/bitcore-p2p.git",
-    "bloom-filter": "^0.1.1",
+    "bitcore-spv": "git://github.com/throughnothing/bitcore-spv.git",
     "bootstrap": "^3.3.2",
     "bootstrap-webpack": "0.0.3",
     "chrome-dgram": "^2.1.0",

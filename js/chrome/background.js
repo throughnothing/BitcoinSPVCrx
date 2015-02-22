@@ -1,5 +1,5 @@
 'use strict';
-var Pool = require('../bitcoin/pool');
+var Pool = require('bitcore-spv').Pool;
 // TODO: include the wallet here as well
 
 
